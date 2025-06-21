@@ -235,6 +235,29 @@
 }
 ```
 
+### 7.获取最近访问的知识库
+- **URL**: `GET /knowledgeBase/recent`
+- **描述**: 获取最近访问的知识库
+- **请求头**: `Authorization: Bearer <token>`
+- **请求体参数param**:
+
+|参数名|位置|类型|必填|说明|
+|--|--|--|--|--|
+limit|query|number|否|返回的数量，默认 5|
+
+
+- **响应**:
+
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 1, "name": "知识库A" },
+    { "id": 2, "name": "知识库B" }
+  ]
+}
+```
+
 ## 文件夹相关接口
 
 ### 1. 根据文件夹 id 获取第一层文档和文件夹 id
