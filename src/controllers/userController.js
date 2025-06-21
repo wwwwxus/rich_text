@@ -90,8 +90,49 @@ const getProfile = async (req, res) => {
   }
 };
 
+// 根据邮箱搜索用户（以便添加协作）
+const searchUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: '邮箱参数不能为空'
+      });
+    }
+    
+    const user = await User.findOne({
+      where: { 
+        email: email,
+        isActive: true
+      },
+      attributes: ['id', 'username', 'email']
+    });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('搜索用户失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '搜索用户失败'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
-  getProfile
+  getProfile,
+  searchUserByEmail
 }; 
