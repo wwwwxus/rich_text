@@ -231,18 +231,82 @@ const updateKnowledgeBase = async (req, res) => {
 };
 
 // 邀请协作
+// const inviteCollaboration = async (req, res) => {
+//   try {
+//     const { email, knowledgeBaseId, permission } = req.body; // 新增 permission
+//     const currentUserId = req.user.id;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "邮箱参数不能为空",
+//       });
+//     }
+
+//     // 检查是否为知识库所有者
+//     const knowledgeBase = await KnowledgeBase.findOne({
+//       where: { id: knowledgeBaseId, ownerId: currentUserId, isActive: true },
+//     });
+
+//     if (!knowledgeBase) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "知识库不存在或无权限邀请",
+//       });
+//     }
+
+//     // 检查被邀请用户是否存在
+//     const invitedUser = await User.findOne({
+//       where: {
+//         email: email,
+//         isActive: true,
+//       },
+//       attributes: ["id", "username", "email"],
+//     });
+
+//     if (!invitedUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "用户不存在",
+//       });
+//     }
+
+//     // 检查是否已经存在协作关系
+//     const existingCollaboration = await Collaboration.findOne({
+//       where: { userId: invitedUser.id, knowledgeBaseId: knowledgeBaseId },
+//     });
+
+//     if (existingCollaboration) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "该用户已经是协作者",
+//       });
+//     }
+
+//     // 创建协作关系，使用传入的权限，默认为'read'
+//     await Collaboration.create({
+//       userId: invitedUser.id,
+//       knowledgeBaseId: knowledgeBaseId,
+//       permission: permission || "read",
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "邀请协作成功",
+//     });
+//   } catch (error) {
+//     console.error("邀请协作失败:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "邀请协作失败",
+//     });
+//   }
+// };
+
 const inviteCollaboration = async (req, res) => {
   try {
-    const { email, knowledgeBaseId, permission } = req.body; // 新增 permission
+    const { userId, knowledgeBaseId, permission } = req.body; // 新增 permission
     const currentUserId = req.user.id;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "邮箱参数不能为空",
-      });
-    }
-
     // 检查是否为知识库所有者
     const knowledgeBase = await KnowledgeBase.findOne({
       where: { id: knowledgeBaseId, ownerId: currentUserId, isActive: true },
@@ -257,11 +321,7 @@ const inviteCollaboration = async (req, res) => {
 
     // 检查被邀请用户是否存在
     const invitedUser = await User.findOne({
-      where: {
-        email: email,
-        isActive: true,
-      },
-      attributes: ["id", "username", "email"],
+      where: { id: userId, isActive: true },
     });
 
     if (!invitedUser) {
@@ -273,7 +333,7 @@ const inviteCollaboration = async (req, res) => {
 
     // 检查是否已经存在协作关系
     const existingCollaboration = await Collaboration.findOne({
-      where: { userId: invitedUser.id, knowledgeBaseId: knowledgeBaseId },
+      where: { userId: userId, knowledgeBaseId: knowledgeBaseId },
     });
 
     if (existingCollaboration) {
@@ -285,7 +345,7 @@ const inviteCollaboration = async (req, res) => {
 
     // 创建协作关系，使用传入的权限，默认为'read'
     await Collaboration.create({
-      userId: invitedUser.id,
+      userId: userId,
       knowledgeBaseId: knowledgeBaseId,
       permission: permission || "read",
     });
