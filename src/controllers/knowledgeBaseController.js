@@ -303,6 +303,84 @@ const inviteCollaboration = async (req, res) => {
   }
 };
 
+// 获取最近访问的知识库
+const getRecentKnowledgeBases = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 5; // 默认返回5条
+
+    // 获取最近访问记录，按访问时间倒序排列
+    const recentAccesses = await RecentAccess.findAll({
+      where: { userId: userId },
+      order: [["lastAccessedAt", "DESC"]],
+      limit: limit,
+      include: [
+        {
+          model: KnowledgeBase,
+          where: { isActive: true },
+          attributes: ["id", "name", "description"],
+        },
+      ],
+    });
+
+    // 处理数据，只返回有效的知识库信息
+    const validRecentKBs = [];
+    for (const access of recentAccesses) {
+      if (access.KnowledgeBase) {
+        // 检查用户是否仍有访问权限
+        const hasAccess = await checkKnowledgeBaseAccess(
+          userId,
+          access.knowledgeBaseId
+        );
+        if (hasAccess) {
+          // 获取权限信息
+          let permission = "read";
+          const owned = await KnowledgeBase.findOne({
+            where: {
+              id: access.knowledgeBaseId,
+              ownerId: userId,
+              isActive: true,
+            },
+          });
+
+          if (owned) {
+            permission = "owner";
+          } else {
+            const collab = await Collaboration.findOne({
+              where: {
+                userId: userId,
+                knowledgeBaseId: access.knowledgeBaseId,
+              },
+            });
+            if (collab) {
+              permission = collab.permission;
+            }
+          }
+
+          validRecentKBs.push({
+            id: access.KnowledgeBase.id,
+            name: access.KnowledgeBase.name,
+            description: access.KnowledgeBase.description,
+            permission: permission,
+            lastAccessedAt: access.lastAccessedAt,
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: validRecentKBs,
+    });
+  } catch (error) {
+    console.error("获取最近访问知识库失败:", error);
+    res.status(500).json({
+      success: false,
+      message: "获取最近访问知识库失败",
+    });
+  }
+};
+
 // 最近打开的知识库
 const updateRecentAccess = async (userId, knowledgeBaseId) => {
   try {
@@ -353,4 +431,5 @@ module.exports = {
   deleteKnowledgeBase,
   updateKnowledgeBase,
   inviteCollaboration,
+  getRecentKnowledgeBases,
 };
