@@ -13,17 +13,13 @@ const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // 检查用户是否已存在
-    const userExists = await User.findOne({
-      where: {
-        [Op.or]: [{ email }, { username }]
-      }
-    });
+    // 检查邮箱是否已存在
+    const emailExists = await User.findOne({ where: { email } });
 
-    if (userExists) {
+    if (emailExists) {
       return res.status(200).json({
         code: 400,
-        message: '用户已存在',
+        message: '该邮箱已被注册',
         data: null
       });
     }
@@ -38,8 +34,8 @@ const register = async (req, res) => {
     // 生成 token
     const token = generateToken(user.id);
 
-    res.status(201).json({
-      code: 201,
+    res.status(200).json({
+      code: 200,
       message: '注册成功',
       data: {
         id: user.id,
