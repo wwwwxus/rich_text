@@ -21,7 +21,11 @@ const register = async (req, res) => {
     });
 
     if (userExists) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(200).json({
+        code: 400,
+        message: '用户已存在',
+        data: null
+      });
     }
 
     // 创建新用户
@@ -35,13 +39,21 @@ const register = async (req, res) => {
     const token = generateToken(user.id);
 
     res.status(201).json({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      token
+      code: 201,
+      message: '注册成功',
+      data: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        token
+      }
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(200).json({
+      code: 400,
+      message: error.message,
+      data: null
+    });
   }
 };
 
@@ -54,27 +66,43 @@ const login = async (req, res) => {
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(200).json({
+        code: 401,
+        message: '用户不存在',
+        data: null
+      });
     }
 
     // 验证密码
     const isMatch = await user.validatePassword(password);
 
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(200).json({
+        code: 401,
+        message: '密码不正确',
+        data: null
+      });
     }
 
     // 生成 token
     const token = generateToken(user.id);
 
     res.json({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      token
+      code: 200,
+      message: '登录成功',
+      data: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        token
+      }
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(200).json({
+      code: 400,
+      message: error.message,
+      data: null
+    });
   }
 };
 
@@ -84,9 +112,17 @@ const getProfile = async (req, res) => {
     const user = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password'] }
     });
-    res.json(user);
+    res.json({
+      code: 200,
+      message: '获取成功',
+      data: user
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(200).json({
+      code: 400,
+      message: error.message,
+      data: null
+    });
   }
 };
 
@@ -94,38 +130,42 @@ const getProfile = async (req, res) => {
 const searchUserByEmail = async (req, res) => {
   try {
     const { email } = req.query;
-    
+
     if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: '邮箱参数不能为空'
+      return res.status(200).json({
+        code: 400,
+        message: '邮箱参数不能为空',
+        data: null
       });
     }
-    
+
     const user = await User.findOne({
-      where: { 
+      where: {
         email: email,
         isActive: true
       },
       attributes: ['id', 'username', 'email']
     });
-    
+
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '用户不存在'
+      return res.status(200).json({
+        code: 404,
+        message: '用户不存在',
+        data: null
       });
     }
-    
+
     res.json({
-      success: true,
+      code: 200,
+      message: '操作成功',
       data: user
     });
   } catch (error) {
     console.error('搜索用户失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '搜索用户失败'
+    res.status(200).json({
+      code: 500,
+      message: '搜索用户失败',
+      data: null
     });
   }
 };
