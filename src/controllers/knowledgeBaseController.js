@@ -149,8 +149,8 @@ const createKnowledgeBase = async (req, res) => {
       ownerId: userId,
     });
 
-    res.status(201).json({
-      code: 201,
+    res.status(200).json({
+      code: 200,
       message: "知识库创建成功",
       data: knowledgeBase,
     });
