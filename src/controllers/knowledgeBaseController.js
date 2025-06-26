@@ -412,15 +412,30 @@ const getRecentKnowledgeBases = async (req, res) => {
       attributes: ["id", "name", "description"]
     });
 
-    // 保持 recentKBIds 的顺序
-    const orderedKnowledgeBases = recentKBIds
-      .map(id => knowledgeBases.find(kb => kb.id === id))
-      .filter(kb => kb); // 过滤掉可能已失效的知识库
+    // 将知识库详情映射到其ID，方便查找
+    const kbMap = new Map(knowledgeBases.map(kb => [kb.id, kb]));
+
+    // 组合数据，附加访问时间
+    const result = recentAccesses
+      .map(access => {
+        const knowledgeBase = kbMap.get(access.knowledgeBaseId);
+        if (knowledgeBase) {
+          return {
+            id: knowledgeBase.id,
+            name: knowledgeBase.name,
+            description: knowledgeBase.description,
+            // 使用 .get() 来获取聚合查询的别名(alias)字段
+            lastAccessedAt: access.get('maxLastAccessedAt')
+          };
+        }
+        return null;
+      })
+      .filter(kb => kb); // 过滤掉无效结果
 
     res.json({
       code: 200,
       message: "操作成功",
-      data: orderedKnowledgeBases,
+      data: result,
     });
   } catch (error) {
     console.error("获取最近访问失败:", error);
