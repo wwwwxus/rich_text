@@ -4,7 +4,7 @@ const Folder = require("../models/Folder");
 const Document = require("../models/Document");
 const RecentAccess = require("../models/RecentAccess");
 const User = require("../models/User");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 
 // 获取可访问的知识库信息
 const getAccessibleKnowledgeBases = async (req, res) => {
@@ -375,81 +375,58 @@ const inviteCollaboration = async (req, res) => {
   }
 };
 
-// 获取最近访问的知识库
+// 获取最近访问的知识库列表
 const getRecentKnowledgeBases = async (req, res) => {
   try {
     const userId = req.user.id;
-    const limit = parseInt(req.query.limit) || 5; // 默认返回5条
+    const limit = 5;
 
-    // 获取最近访问记录，按访问时间倒序排列
+    // 步骤1: 获取唯一的、按最新访问时间排序的知识库ID
     const recentAccesses = await RecentAccess.findAll({
-      where: { userId: userId },
-      order: [["lastAccessedAt", "DESC"]],
-      limit: limit,
-      include: [
-        {
-          model: KnowledgeBase,
-          where: { isActive: true },
-          attributes: ["id", "name", "description"],
-        },
+      where: { userId },
+      attributes: [
+        'knowledgeBaseId',
+        [fn('MAX', col('lastAccessedAt')), 'maxLastAccessedAt']
       ],
+      group: ['knowledgeBaseId'],
+      order: [[col('maxLastAccessedAt'), 'DESC']],
+      limit: limit
     });
 
-    // 处理数据，只返回有效的知识库信息
-    const validRecentKBs = [];
-    for (const access of recentAccesses) {
-      if (access.KnowledgeBase) {
-        // 检查用户是否仍有访问权限
-        const hasAccess = await checkKnowledgeBaseAccess(
-          userId,
-          access.knowledgeBaseId
-        );
-        if (hasAccess) {
-          // 获取权限信息
-          let permission = "read";
-          const owned = await KnowledgeBase.findOne({
-            where: {
-              id: access.knowledgeBaseId,
-              ownerId: userId,
-              isActive: true,
-            },
-          });
+    const recentKBIds = recentAccesses.map(access => access.knowledgeBaseId);
 
-          if (owned) {
-            permission = "owner";
-          } else {
-            const collab = await Collaboration.findOne({
-              where: {
-                userId: userId,
-                knowledgeBaseId: access.knowledgeBaseId,
-              },
-            });
-            if (collab) {
-              permission = collab.permission;
-            }
-          }
-
-          validRecentKBs.push({
-            id: access.KnowledgeBase.id,
-            name: access.KnowledgeBase.name,
-            description: access.KnowledgeBase.description,
-            permission: permission,
-            lastAccessedAt: access.lastAccessedAt,
-          });
-        }
-      }
+    if (recentKBIds.length === 0) {
+      return res.json({
+        code: 200,
+        message: "操作成功",
+        data: [],
+      });
     }
+
+    // 步骤2: 根据ID获取知识库详情
+    const knowledgeBases = await KnowledgeBase.findAll({
+      where: {
+        id: { [Op.in]: recentKBIds },
+        isActive: true
+      },
+      attributes: ["id", "name", "description"]
+    });
+
+    // 保持 recentKBIds 的顺序
+    const orderedKnowledgeBases = recentKBIds
+      .map(id => knowledgeBases.find(kb => kb.id === id))
+      .filter(kb => kb); // 过滤掉可能已失效的知识库
 
     res.json({
       code: 200,
       message: "操作成功",
-      data: validRecentKBs,
+      data: orderedKnowledgeBases,
     });
   } catch (error) {
-    console.error("获取最近访问知识库失败:", error);
-    res.status(200).json({
+    console.error("获取最近访问失败:", error);
+    res.status(500).json({
       code: 500,
-      message: "获取可访问知识库失败",
+      message: "获取最近访问失败",
       data: null,
     });
   }
