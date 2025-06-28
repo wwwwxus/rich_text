@@ -4,6 +4,9 @@ const sequelize = require("./config/database");
 const userRoutes = require("./routes/userRoutes");
 const knowledgeBaseRoutes = require("./routes/knowledgeBaseRoutes");
 const folderRoutes = require("./routes/folderRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const textCommentRoutes = require("./routes/textCommentRoutes");
+const versionRoutes = require("./routes/versionRoutes");
 require("dotenv").config();
 
 // 导入模型
@@ -13,6 +16,8 @@ const Collaboration = require("./models/Collaboration");
 const Folder = require("./models/Folder");
 const Document = require("./models/Document");
 const RecentAccess = require("./models/RecentAccess");
+const TextComment = require("./models/TextComment");
+const DocumentVersion = require("./models/DocumentVersion");
 
 const app = express();
 
@@ -62,18 +67,37 @@ const setupAssociations = () => {
   Folder.hasMany(Document, { foreignKey: "folderId" });
   Document.belongsTo(Folder, { foreignKey: "folderId" });
 
+  // 用户与文档的关系（拥有）
+  User.hasMany(Document, { foreignKey: "ownerId", as: "ownedDocuments" });
+  Document.belongsTo(User, { foreignKey: "ownerId", as: "owner" });
+
   // 用户与最近访问的关系
   User.hasMany(RecentAccess, { foreignKey: "userId" });
   RecentAccess.belongsTo(User, { foreignKey: "userId" });
 
   KnowledgeBase.hasMany(RecentAccess, { foreignKey: "knowledgeBaseId" });
   RecentAccess.belongsTo(KnowledgeBase, { foreignKey: "knowledgeBaseId" });
+
+  // 文档与文本评论的关系
+  Document.hasMany(TextComment, { foreignKey: "documentId" });
+  TextComment.belongsTo(Document, { foreignKey: "documentId" });
+
+  // 用户与文本评论的关系
+  User.hasMany(TextComment, { foreignKey: "userId" });
+  TextComment.belongsTo(User, { foreignKey: "userId" });
+
+  // 文档与版本的关系
+  Document.hasMany(DocumentVersion, { foreignKey: "documentId" });
+  DocumentVersion.belongsTo(Document, { foreignKey: "documentId" });
 };
 
 // 路由
 app.use("/api/users", userRoutes);
 app.use("/api/knowledgeBase", knowledgeBaseRoutes);
 app.use("/api/folders", folderRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/text-comments", textCommentRoutes);
+app.use("/api/versions", versionRoutes);
 
 // 数据库连接和服务器启动
 const PORT = process.env.PORT || 3000;

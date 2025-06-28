@@ -15,6 +15,11 @@ const Document = sequelize.define('Document', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  ownerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    comment: 'ÎÄµµÓµÓÐÕßID'
+  },
   knowledgeBaseId: {
     type: DataTypes.INTEGER,
     allowNull: false

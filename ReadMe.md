@@ -1,87 +1,61 @@
-# 知识库管理系统
+# 富文本知识库系统
 
-一个基于 Node.js + Express + MySQL 的知识库管理系统，支持用户认证、知识库管理、文件夹管理和协作功能。
+这是一个基于Node.js和MySQL的富文本知识库系统，支持文档管理、文本评论和版本控制功能。
 
 ## 功能特性
 
-### 用户管理
+### 文档管理
+- ✅ 获取文档内容
+- ✅ 保存富文本内容
+- ✅ 删除文档（仅拥有者）
 
-- 用户注册和登录
-- JWT Token 认证
-- 个人信息管理
-- 用户搜索（用于协作邀请）
+### 文本评论
+- ✅ 选中文本添加评论
+- ✅ 获取文本评论
+- ✅ 删除评论（仅发布者）
+- ✅ 获取文档的所有文本评论
 
-### 知识库管理
-
-- 创建、编辑、删除知识库
-- 知识库权限管理
-- 协作邀请功能
-- 最近访问记录
-
-### 文件夹管理
-
-- 创建、编辑、删除文件夹
-- 层级文件夹结构
-- 文件夹内容浏览
-
-### 权限控制
-
-- 基于角色的权限系统
-- 知识库所有者拥有全部权限
-- 协作者拥有读取权限
-- 所有操作都需要认证
+### 版本控制
+- ✅ 自动版本管理（保存时自动创建版本）
+- ✅ 查看版本列表
+- ✅ 获取特定版本内容
+- ✅ 版本回退功能
+- ✅ 删除版本（仅拥有者）
 
 ## 技术栈
 
 - **后端**: Node.js + Express
-- **数据库**: MySQL
-- **ORM**: Sequelize
-- **认证**: JWT (jsonwebtoken)
-- **密码加密**: bcryptjs
-- **跨域**: CORS
+- **数据库**: MySQL + Sequelize ORM
+- **认证**: JWT Token
+- **其他**: bcryptjs, cors, dotenv
 
 ## 安装和运行
 
-### 1. 克隆项目
-
-```bash
-git clone <repository-url>
-cd rich_text
-```
-
-### 2. 安装依赖
-
+### 1. 安装依赖
 ```bash
 npm install
 ```
 
-### 3. 配置环境变量
-
+### 2. 配置环境变量
 创建 `.env` 文件并配置以下变量：
-
 ```env
 DB_HOST=localhost
 DB_USER=your_username
 DB_PASSWORD=your_password
-DB_NAME=rich_text_db
-JWT_SECRET=your_jwt_secret_key
+DB_NAME=your_database
+JWT_SECRET=your_jwt_secret
 PORT=3000
 ```
 
-### 4. 初始化数据库
-
+### 3. 数据库设置
 ```bash
+# 确保MySQL服务运行
 # 创建数据库
 mysql -u root -p
-CREATE DATABASE rich_text_db;
-USE rich_text_db;
-
-# 运行SQL脚本
-mysql -u root -p rich_text_db < database.sql
+CREATE DATABASE your_database;
 ```
 
-### 5. 启动服务器
-
+### 4. 启动服务
 ```bash
 # 开发模式
 npm run dev
@@ -90,65 +64,160 @@ npm run dev
 npm start
 ```
 
-服务器将在 `http://127.0.0.1:3300` 启动。
+## API 接口
 
-## API 文档
+### 文档管理接口
 
-详细的 API 文档请参考 [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
+#### 获取文档内容
+```
+GET /api/documents/:documentId/:userId
+```
+
+#### 保存富文本
+```
+POST /api/documents/save
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "documentId": 1,
+  "newContent": "新的文档内容",
+  "updateTime": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### 删除文档
+```
+DELETE /api/documents/:documentId/:userId
+```
+
+### 文本评论接口
+
+#### 添加文本评论
+```
+POST /api/text-comments/add
+Content-Type: application/json
+
+{
+  "textNanoid": "unique_text_id",
+  "textContent": "被选中的文本内容",
+  "comment": "评论内容",
+  "userId": 1,
+  "documentId": 1
+}
+```
+
+#### 获取文本评论
+```
+GET /api/text-comments/:textNanoid
+```
+
+#### 删除评论
+```
+DELETE /api/text-comments/:commentId
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+```
+
+### 版本管理接口
+
+#### 添加版本
+```
+POST /api/versions/add
+Content-Type: application/json
+
+{
+  "documentId": 1,
+  "versionNumber": 1,
+  "content": "版本内容",
+  "diff": "与上一版本的差别",
+  "savedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### 查看版本列表
+```
+GET /api/versions/:documentId
+```
+
+#### 回退版本
+```
+POST /api/versions/:documentId/:versionNumber/rollback
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+```
 
 ## 数据库结构
 
-### 主要表结构
+### Documents 表
+- `id`: 主键
+- `title`: 文档标题
+- `content`: 文档内容
+- `ownerId`: 文档拥有者ID
+- `knowledgeBaseId`: 所属知识库ID
+- `folderId`: 所属文件夹ID
+- `isActive`: 是否有效
 
-1. **Users** - 用户表
-2. **KnowledgeBases** - 知识库表
-3. **Collaborations** - 协作关系表
-4. **Folders** - 文件夹表
-5. **Documents** - 文档表
-6. **RecentAccess** - 最近访问记录表
+### TextComments 表
+- `id`: 主键
+- `textNanoid`: 文本唯一标识
+- `textContent`: 被选中的文本内容
+- `comment`: 评论内容
+- `userId`: 评论用户ID
+- `documentId`: 文档ID
+- `isActive`: 是否有效
 
-### 关系说明
+### DocumentVersions 表
+- `id`: 主键
+- `documentId`: 文档ID
+- `versionNumber`: 版本号
+- `content`: 版本内容
+- `diff`: 与上一版本的差别
+- `savedAt`: 保存时间
+- `isActive`: 是否有效
 
-- 用户可以拥有多个知识库
-- 知识库可以有多个协作者
-- 知识库包含多个文件夹和文档
-- 文件夹支持层级结构
-- 文档可以属于文件夹或直接属于知识库
+## 测试
 
-## 项目结构
+运行API测试：
+```bash
+node test_api.js
+```
 
+## 权限说明
+
+1. **文档访问权限**: 只有文档拥有者或协作者可以访问文档
+2. **文档编辑权限**: 只有文档拥有者或协作者可以编辑文档
+3. **文档删除权限**: 只有文档拥有者可以删除文档
+4. **评论删除权限**: 只有评论发布者可以删除自己的评论
+5. **版本管理权限**: 只有文档拥有者可以管理版本（回退、删除等）
+
+## 开发说明
+
+### 项目结构
 ```
 src/
 ├── app.js                 # 主应用文件
 ├── config/
 │   └── database.js        # 数据库配置
-├── controllers/
-│   ├── userController.js      # 用户控制器
-│   ├── knowledgeBaseController.js  # 知识库控制器
-│   └── folderController.js    # 文件夹控制器
-├── middleware/
-│   └── auth.js           # 认证中间件
-├── models/
-│   ├── User.js           # 用户模型
-│   ├── KnowledgeBase.js  # 知识库模型
-│   ├── Collaboration.js  # 协作关系模型
-│   ├── Folder.js         # 文件夹模型
-│   ├── Document.js       # 文档模型
-│   └── RecentAccess.js   # 最近访问模型
-└── routes/
-    ├── userRoutes.js         # 用户路由
-    ├── knowledgeBaseRoutes.js # 知识库路由
-    └── folderRoutes.js       # 文件夹路由
+├── controllers/           # 控制器
+│   ├── documentController.js
+│   ├── textCommentController.js
+│   └── versionController.js
+├── models/               # 数据模型
+│   ├── Document.js
+│   ├── TextComment.js
+│   └── DocumentVersion.js
+└── routes/               # 路由
+    ├── documentRoutes.js
+    ├── textCommentRoutes.js
+    └── versionRoutes.js
 ```
-
-## 测试账号
-
-系统预置了测试账号：
-
-- 邮箱: `admin@example.com` / 密码: `password`
-- 邮箱: `test@example.com` / 密码: `password`
-
-## 开发说明
 
 ### 添加新功能
 
@@ -157,9 +226,17 @@ src/
 3. 在 `routes/` 目录下创建路由
 4. 在 `app.js` 中注册路由和模型关联
 
-### 数据库迁移
+## 注意事项
 
-使用 Sequelize 的 `sync()` 方法自动同步数据库结构，或手动执行 SQL 脚本。
+1. 所有删除操作都是软删除（设置 `isActive = false`）
+2. 版本号从0开始，每次保存自动递增
+3. 文本评论使用 nanoid 作为唯一标识
+4. 权限检查在控制器层实现
+5. 错误处理统一返回格式
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
 
 ## 许可证
 
