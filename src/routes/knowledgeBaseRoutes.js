@@ -9,6 +9,12 @@ router.use(auth);
 // 获取可访问的知识库信息
 router.get("/accessible", knowledgeBaseController.getAccessibleKnowledgeBases);
 
+//判断用户是否可以访问该知识库
+router.get(
+  "/:knowledgeBaseId/auth",
+  knowledgeBaseController.checkKnowledgeBaseAuth
+);
+
 // 获取最近访问的知识库
 router.get("/recent", knowledgeBaseController.getRecentKnowledgeBases);
 
