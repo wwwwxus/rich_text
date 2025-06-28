@@ -280,34 +280,47 @@ const checkKnowledgeBaseAccess = async (userId, knowledgeBaseId) => {
   }
 };
 
-// // AI 文档摘要接口
-// const generateSummary = async (req, res) => {
-//   try {
-//     const { documentText } = req.body;
-//     if (!documentText) {
-//       return res.status(400).json({ error: "文档内容不能为空" });
-//     }
-//     const openai = new OpenAI({
-//       apiKey: process.env.VOLC_ENGINE_API_KEY, // 从环境变量获取
-//       baseURL: "https://ark.cn-beijing.volces.com/api/v3",
-//     });
-//     const response = await openai.chat.completions.create({
-//       model: "ep-20250627232809-8d2lz",
-//       messages: [
-//         {
-//           role: "user",
-//           content: `请对以下文档进行摘要，控制在300字内：\n${documentText}`,
-//         },
-//       ],
-//       temperature: 0.4,
-//       max_tokens: 300,
-//     });
-//     res.json({ summary: response.choices[0].message.content });
-//   } catch (error) {
-//     console.error("API调用失败：", error);
-//     res.status(500).json({ error: "摘要生成失败" });
-//   }
-// };
+// AI 文档摘要接口
+const generateSummary = async (req, res) => {
+  try {
+    const { documentText } = req.body;
+    if (!documentText) {
+      return res.status(200).json({
+        code: 400,
+        message: "文档内容不能为空",
+        data: null,
+      });
+    }
+    const openai = new OpenAI({
+      apiKey: process.env.VOLC_ENGINE_API_KEY, // 从环境变量获取
+      baseURL: "https://ark.cn-beijing.volces.com/api/v3",
+    });
+    const response = await openai.chat.completions.create({
+      model: "ep-20250627232809-8d2lz",
+      messages: [
+        {
+          role: "user",
+          content: `请对以下文档进行摘要，控制在300字内：\n${documentText}`,
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 50,
+    });
+    const summary = response.choices?.[0]?.message?.content || "";
+    res.status(200).json({
+      code: summary ? 200 : 500,
+      message: summary ? "摘要生成成功" : "AI未返回摘要内容",
+      data: summary ? { summary } : null,
+    });
+  } catch (error) {
+    console.error("API调用失败：", error);
+    res.status(200).json({
+      code: 500,
+      message: "摘要生成失败",
+      data: null,
+    });
+  }
+};
 
 module.exports = {
   getFolderContent,

@@ -19,6 +19,6 @@ router.delete("/:id", folderController.deleteFolder);
 router.put("/:id", folderController.updateFolderName);
 
 // AI 文档摘要接口
-// router.post("/summary", folderController.generateSummary);
+router.post("/summary", folderController.generateSummary);
 
 module.exports = router;
