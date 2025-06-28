@@ -69,7 +69,7 @@ const getAccessibleKnowledgeBases = async (req, res) => {
   }
 };
 
-// 根据知识库id获取第一层内部文档和文件夹
+// 根据知识库id获取知识库信息(名字id和协作人），第一层内部文档和文件夹
 const getKnowledgeBaseContent = async (req, res) => {
   try {
     const { knowledgeBaseId } = req.params;
@@ -84,6 +84,11 @@ const getKnowledgeBaseContent = async (req, res) => {
         data: null,
       });
     }
+    //知识库信息
+    const knowledgeBase = await KnowledgeBase.findOne({
+      where: { id: knowledgeBaseId, isActive: true },
+      attributes: ["id", "name", "description"],
+    });
 
     // 获取第一层文件夹（parentFolderId为null），返回id和name
     const folders = await Folder.findAll({
@@ -98,11 +103,19 @@ const getKnowledgeBaseContent = async (req, res) => {
     // 获取第一层文档（folderId为null），返回id和name
     const documents = await Document.findAll({
       where: {
-        knowledgeBaseId: knowledgeBaseId,
+        knowledgeBaseId,
         folderId: null,
         isActive: true,
       },
       attributes: ["id", "title"],
+    });
+
+    //获取协作人
+    const collaborators = await Collaboration.findAll({
+      where: {
+        knowledgeBaseId,
+      },
+      attributes: ["userId"],
     });
 
     // 更新最近访问记录
@@ -117,6 +130,12 @@ const getKnowledgeBaseContent = async (req, res) => {
           id: folder.id,
           name: folder.name,
         })),
+        knowledgeBaseInfo: {
+          id: knowledgeBase.id,
+          name: knowledgeBase.name,
+          desc: knowledgeBase.description,
+          collaborators: collaborators.map((ele) => ele.userId),
+        },
       },
     });
   } catch (error) {
@@ -348,7 +367,7 @@ const inviteCollaboration = async (req, res) => {
       where: { userId: userId, knowledgeBaseId: knowledgeBaseId },
     });
 
-    if (existingCollaboration) {
+    if (existingCollaboration || invitedUser.id === knowledgeBase.ownerId) {
       return res.status(200).json({
         code: 400,
         message: "该用户已经是协作者",
@@ -385,15 +404,15 @@ const getRecentKnowledgeBases = async (req, res) => {
     const recentAccesses = await RecentAccess.findAll({
       where: { userId },
       attributes: [
-        'knowledgeBaseId',
-        [fn('MAX', col('lastAccessedAt')), 'maxLastAccessedAt']
+        "knowledgeBaseId",
+        [fn("MAX", col("lastAccessedAt")), "maxLastAccessedAt"],
       ],
-      group: ['knowledgeBaseId'],
-      order: [[col('maxLastAccessedAt'), 'DESC']],
-      limit: limit
+      group: ["knowledgeBaseId"],
+      order: [[col("maxLastAccessedAt"), "DESC"]],
+      limit: limit,
     });
 
-    const recentKBIds = recentAccesses.map(access => access.knowledgeBaseId);
+    const recentKBIds = recentAccesses.map((access) => access.knowledgeBaseId);
 
     if (recentKBIds.length === 0) {
       return res.json({
@@ -407,17 +426,17 @@ const getRecentKnowledgeBases = async (req, res) => {
     const knowledgeBases = await KnowledgeBase.findAll({
       where: {
         id: { [Op.in]: recentKBIds },
-        isActive: true
+        isActive: true,
       },
-      attributes: ["id", "name", "description"]
+      attributes: ["id", "name", "description"],
     });
 
     // 将知识库详情映射到其ID，方便查找
-    const kbMap = new Map(knowledgeBases.map(kb => [kb.id, kb]));
+    const kbMap = new Map(knowledgeBases.map((kb) => [kb.id, kb]));
 
     // 组合数据，附加访问时间
     const result = recentAccesses
-      .map(access => {
+      .map((access) => {
         const knowledgeBase = kbMap.get(access.knowledgeBaseId);
         if (knowledgeBase) {
           return {
@@ -425,12 +444,12 @@ const getRecentKnowledgeBases = async (req, res) => {
             name: knowledgeBase.name,
             description: knowledgeBase.description,
             // 使用 .get() 来获取聚合查询的别名(alias)字段
-            lastAccessedAt: access.get('maxLastAccessedAt')
+            lastAccessedAt: access.get("maxLastAccessedAt"),
           };
         }
         return null;
       })
-      .filter(kb => kb); // 过滤掉无效结果
+      .filter((kb) => kb); // 过滤掉无效结果
 
     res.json({
       code: 200,

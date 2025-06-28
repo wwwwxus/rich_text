@@ -1,10 +1,11 @@
-const { Op } = require('sequelize');
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+const { Op } = require("sequelize");
+const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+const Collaboration = require("../models/Collaboration");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
+    expiresIn: "30d",
   });
 };
 
@@ -19,8 +20,8 @@ const register = async (req, res) => {
     if (emailExists) {
       return res.status(200).json({
         code: 400,
-        message: '该邮箱已被注册',
-        data: null
+        message: "该邮箱已被注册",
+        data: null,
       });
     }
 
@@ -28,7 +29,7 @@ const register = async (req, res) => {
     const user = await User.create({
       username,
       email,
-      password
+      password,
     });
 
     // 生成 token
@@ -36,19 +37,19 @@ const register = async (req, res) => {
 
     res.status(200).json({
       code: 200,
-      message: '注册成功',
+      message: "注册成功",
       data: {
         id: user.id,
         username: user.username,
         email: user.email,
-        token
-      }
+        token,
+      },
     });
   } catch (error) {
     res.status(200).json({
       code: 400,
       message: error.message,
-      data: null
+      data: null,
     });
   }
 };
@@ -64,8 +65,8 @@ const login = async (req, res) => {
     if (!user) {
       return res.status(200).json({
         code: 401,
-        message: '用户不存在',
-        data: null
+        message: "用户不存在",
+        data: null,
       });
     }
 
@@ -75,8 +76,8 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res.status(200).json({
         code: 401,
-        message: '密码不正确',
-        data: null
+        message: "密码不正确",
+        data: null,
       });
     }
 
@@ -85,19 +86,19 @@ const login = async (req, res) => {
 
     res.json({
       code: 200,
-      message: '登录成功',
+      message: "登录成功",
       data: {
         id: user.id,
         username: user.username,
         email: user.email,
-        token
-      }
+        token,
+      },
     });
   } catch (error) {
     res.status(200).json({
       code: 400,
       message: error.message,
-      data: null
+      data: null,
     });
   }
 };
@@ -106,18 +107,18 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ["password"] },
     });
     res.json({
       code: 200,
-      message: '获取成功',
-      data: user
+      message: "获取成功",
+      data: user,
     });
   } catch (error) {
     res.status(200).json({
       code: 400,
       message: error.message,
-      data: null
+      data: null,
     });
   }
 };
@@ -126,42 +127,56 @@ const getProfile = async (req, res) => {
 const searchUserByEmail = async (req, res) => {
   try {
     const { email } = req.query;
+    
 
     if (!email) {
       return res.status(200).json({
         code: 400,
-        message: '邮箱参数不能为空',
-        data: null
+        message: "邮箱参数不能为空",
+        data: null,
       });
     }
 
-    const user = await User.findOne({
+    // 使用子查询判断用户是否在Collaboration表中
+    const { sequelize } = User;
+    const users = await User.findAll({
       where: {
-        email: email,
-        isActive: true
+        email: {
+          [Op.like]: `%${email}%`,
+        },
+        isActive: true,
+        id: { [Op.ne]: req.user.id }, // 排除自己
       },
-      attributes: ['id', 'username', 'email']
+      attributes: [
+        "id",
+        "username",
+        "email",
+        // 优先级字段：未在Collaboration表中的优先级高
+        [
+          sequelize.literal(
+            `NOT EXISTS (SELECT 1 FROM Collaborations WHERE Collaborations.userId = User.id)`
+          ),
+          "priority",
+        ],
+      ],
+      order: [
+        [sequelize.literal("priority"), "DESC"],
+        ["id", "ASC"],
+      ],
+      limit: 3,
     });
-
-    if (!user) {
-      return res.status(200).json({
-        code: 404,
-        message: '用户不存在',
-        data: null
-      });
-    }
 
     res.json({
       code: 200,
-      message: '操作成功',
-      data: user
+      message: "操作成功",
+      data: users,
     });
   } catch (error) {
-    console.error('搜索用户失败:', error);
+    console.error("搜索用户失败:", error);
     res.status(200).json({
       code: 500,
-      message: '搜索用户失败',
-      data: null
+      message: "搜索用户失败",
+      data: null,
     });
   }
 };
@@ -170,5 +185,5 @@ module.exports = {
   register,
   login,
   getProfile,
-  searchUserByEmail
-}; 
+  searchUserByEmail,
+};
