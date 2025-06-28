@@ -4,7 +4,7 @@ const Folder = require("../models/Folder");
 const Document = require("../models/Document");
 const RecentAccess = require("../models/RecentAccess");
 const User = require("../models/User");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 
 // 获取可访问的知识库信息
 const getAccessibleKnowledgeBases = async (req, res) => {
@@ -55,19 +55,21 @@ const getAccessibleKnowledgeBases = async (req, res) => {
     ];
 
     res.json({
-      success: true,
+      code: 200,
+      message: "操作成功",
       data: accessibleList,
     });
   } catch (error) {
     console.error("获取可访问知识库失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "获取可访问知识库失败",
+      data: null,
     });
   }
 };
 
-// 根据知识库id获取第一层内部文档和文件夹
+// 根据知识库id获取知识库信息(名字id和协作人），第一层内部文档和文件夹
 const getKnowledgeBaseContent = async (req, res) => {
   try {
     const { knowledgeBaseId } = req.params;
@@ -77,10 +79,16 @@ const getKnowledgeBaseContent = async (req, res) => {
     const hasAccess = await checkKnowledgeBaseAccess(userId, knowledgeBaseId);
     if (!hasAccess) {
       return res.status(403).json({
-        success: false,
+        code: 403,
         message: "没有权限访问该知识库",
+        data: null,
       });
     }
+    //知识库信息
+    const knowledgeBase = await KnowledgeBase.findOne({
+      where: { id: knowledgeBaseId, isActive: true },
+      attributes: ["id", "name", "description"],
+    });
 
     // 获取第一层文件夹（parentFolderId为null），返回id和name
     const folders = await Folder.findAll({
@@ -95,31 +103,47 @@ const getKnowledgeBaseContent = async (req, res) => {
     // 获取第一层文档（folderId为null），返回id和name
     const documents = await Document.findAll({
       where: {
-        knowledgeBaseId: knowledgeBaseId,
+        knowledgeBaseId,
         folderId: null,
         isActive: true,
       },
       attributes: ["id", "title"],
     });
 
+    //获取协作人
+    const collaborators = await Collaboration.findAll({
+      where: {
+        knowledgeBaseId,
+      },
+      attributes: ["userId"],
+    });
+
     // 更新最近访问记录
     await updateRecentAccess(userId, knowledgeBaseId);
 
     res.json({
-      success: true,
+      code: 200,
+      message: "操作成功",
       data: {
         documents: documents.map((doc) => ({ id: doc.id, title: doc.title })),
         folders: folders.map((folder) => ({
           id: folder.id,
           name: folder.name,
         })),
+        knowledgeBaseInfo: {
+          id: knowledgeBase.id,
+          name: knowledgeBase.name,
+          desc: knowledgeBase.description,
+          collaborators: collaborators.map((ele) => ele.userId),
+        },
       },
     });
   } catch (error) {
     console.error("获取知识库内容失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "获取知识库内容失败",
+      data: null,
     });
   }
 };
@@ -132,8 +156,9 @@ const createKnowledgeBase = async (req, res) => {
 
     if (!name) {
       return res.status(400).json({
-        success: false,
+        code: 400,
         message: "知识库名称不能为空",
+        data: null,
       });
     }
 
@@ -143,16 +168,17 @@ const createKnowledgeBase = async (req, res) => {
       ownerId: userId,
     });
 
-    res.status(201).json({
-      success: true,
-      data: knowledgeBase,
+    res.status(200).json({
+      code: 200,
       message: "知识库创建成功",
+      data: knowledgeBase,
     });
   } catch (error) {
     console.error("创建知识库失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "创建知识库失败",
+      data: null,
     });
   }
 };
@@ -169,9 +195,10 @@ const deleteKnowledgeBase = async (req, res) => {
     });
 
     if (!knowledgeBase) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "知识库不存在或无权限删除",
+        data: null,
       });
     }
 
@@ -179,14 +206,16 @@ const deleteKnowledgeBase = async (req, res) => {
     await knowledgeBase.update({ isActive: false });
 
     res.json({
-      success: true,
+      code: 200,
       message: "知识库删除成功",
+      data: null,
     });
   } catch (error) {
     console.error("删除知识库失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "删除知识库失败",
+      data: null,
     });
   }
 };
@@ -204,9 +233,10 @@ const updateKnowledgeBase = async (req, res) => {
     });
 
     if (!knowledgeBase) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "知识库不存在或无权限编辑",
+        data: null,
       });
     }
 
@@ -217,15 +247,16 @@ const updateKnowledgeBase = async (req, res) => {
     });
 
     res.json({
-      success: true,
-      data: knowledgeBase,
+      code: 200,
       message: "知识库信息更新成功",
+      data: knowledgeBase,
     });
   } catch (error) {
     console.error("更新知识库失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "更新知识库失败",
+      data: null,
     });
   }
 };
@@ -325,8 +356,8 @@ const inviteCollaboration = async (req, res) => {
     });
 
     if (!invitedUser) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "用户不存在",
       });
     }
@@ -336,9 +367,9 @@ const inviteCollaboration = async (req, res) => {
       where: { userId: userId, knowledgeBaseId: knowledgeBaseId },
     });
 
-    if (existingCollaboration) {
-      return res.status(400).json({
-        success: false,
+    if (existingCollaboration || invitedUser.id === knowledgeBase.ownerId) {
+      return res.status(200).json({
+        code: 400,
         message: "该用户已经是协作者",
       });
     }
@@ -350,93 +381,87 @@ const inviteCollaboration = async (req, res) => {
       permission: permission || "read",
     });
 
-    res.status(201).json({
-      success: true,
+    res.status(200).json({
+      code: 200,
       message: "邀请协作成功",
     });
   } catch (error) {
     console.error("邀请协作失败:", error);
     res.status(500).json({
-      success: false,
+      code: 500,
       message: "邀请协作失败",
     });
   }
 };
 
-// 获取最近访问的知识库
+// 获取最近访问的知识库列表
 const getRecentKnowledgeBases = async (req, res) => {
   try {
     const userId = req.user.id;
-    const limit = parseInt(req.query.limit) || 5; // 默认返回5条
+    const limit = 5;
 
-    // 获取最近访问记录，按访问时间倒序排列
+    // 步骤1: 获取唯一的、按最新访问时间排序的知识库ID
     const recentAccesses = await RecentAccess.findAll({
-      where: { userId: userId },
-      order: [["lastAccessedAt", "DESC"]],
-      limit: limit,
-      include: [
-        {
-          model: KnowledgeBase,
-          where: { isActive: true },
-          attributes: ["id", "name", "description"],
-        },
+      where: { userId },
+      attributes: [
+        "knowledgeBaseId",
+        [fn("MAX", col("lastAccessedAt")), "maxLastAccessedAt"],
       ],
+      group: ["knowledgeBaseId"],
+      order: [[col("maxLastAccessedAt"), "DESC"]],
+      limit: limit,
     });
 
-    // 处理数据，只返回有效的知识库信息
-    const validRecentKBs = [];
-    for (const access of recentAccesses) {
-      if (access.KnowledgeBase) {
-        // 检查用户是否仍有访问权限
-        const hasAccess = await checkKnowledgeBaseAccess(
-          userId,
-          access.knowledgeBaseId
-        );
-        if (hasAccess) {
-          // 获取权限信息
-          let permission = "read";
-          const owned = await KnowledgeBase.findOne({
-            where: {
-              id: access.knowledgeBaseId,
-              ownerId: userId,
-              isActive: true,
-            },
-          });
+    const recentKBIds = recentAccesses.map((access) => access.knowledgeBaseId);
 
-          if (owned) {
-            permission = "owner";
-          } else {
-            const collab = await Collaboration.findOne({
-              where: {
-                userId: userId,
-                knowledgeBaseId: access.knowledgeBaseId,
-              },
-            });
-            if (collab) {
-              permission = collab.permission;
-            }
-          }
-
-          validRecentKBs.push({
-            id: access.KnowledgeBase.id,
-            name: access.KnowledgeBase.name,
-            description: access.KnowledgeBase.description,
-            permission: permission,
-            lastAccessedAt: access.lastAccessedAt,
-          });
-        }
-      }
+    if (recentKBIds.length === 0) {
+      return res.json({
+        code: 200,
+        message: "操作成功",
+        data: [],
+      });
     }
 
+    // 步骤2: 根据ID获取知识库详情
+    const knowledgeBases = await KnowledgeBase.findAll({
+      where: {
+        id: { [Op.in]: recentKBIds },
+        isActive: true,
+      },
+      attributes: ["id", "name", "description"],
+    });
+
+    // 将知识库详情映射到其ID，方便查找
+    const kbMap = new Map(knowledgeBases.map((kb) => [kb.id, kb]));
+
+    // 组合数据，附加访问时间
+    const result = recentAccesses
+      .map((access) => {
+        const knowledgeBase = kbMap.get(access.knowledgeBaseId);
+        if (knowledgeBase) {
+          return {
+            id: knowledgeBase.id,
+            name: knowledgeBase.name,
+            description: knowledgeBase.description,
+            // 使用 .get() 来获取聚合查询的别名(alias)字段
+            lastAccessedAt: access.get("maxLastAccessedAt"),
+          };
+        }
+        return null;
+      })
+      .filter((kb) => kb); // 过滤掉无效结果
+
     res.json({
-      success: true,
-      data: validRecentKBs,
+      code: 200,
+      message: "操作成功",
+      data: result,
     });
   } catch (error) {
-    console.error("获取最近访问知识库失败:", error);
+    console.error("获取最近访问失败:", error);
     res.status(500).json({
-      success: false,
-      message: "获取最近访问知识库失败",
+      code: 500,
+      message: "获取最近访问失败",
+      data: null,
     });
   }
 };

@@ -16,11 +16,13 @@ const getFolderContent = async (req, res) => {
     });
 
     if (!folder) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "文件夹不存在",
+        data: null,
       });
     }
+    console.log(folder);
 
     // 检查用户是否有权限访问该知识库
     const hasAccess = await checkKnowledgeBaseAccess(
@@ -28,9 +30,10 @@ const getFolderContent = async (req, res) => {
       folder.knowledgeBaseId
     );
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
+      return res.status(200).json({
+        code: 403,
         message: "没有权限访问该文件夹",
+        data: null,
       });
     }
 
@@ -49,24 +52,26 @@ const getFolderContent = async (req, res) => {
         folderId: folderId,
         isActive: true,
       },
-      attributes: ["id", "name"],
+      attributes: ["id", "title"],
     });
 
     res.json({
-      success: true,
+      code: 200,
+      message: "操作成功",
       data: {
         folders: subFolders.map((subFolder) => ({
           id: subFolder.id,
           name: subFolder.name,
         })),
-        documents: documents.map((doc) => ({ id: doc.id, name: doc.name })),
+        documents: documents.map((doc) => ({ id: doc.id, name: doc.title })),
       },
     });
   } catch (error) {
     console.error("获取文件夹内容失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "获取文件夹内容失败",
+      data: null,
     });
   }
 };
@@ -78,18 +83,20 @@ const createFolder = async (req, res) => {
     const userId = req.user.id;
 
     if (!name || !knowledgeBaseId) {
-      return res.status(400).json({
-        success: false,
+      return res.status(200).json({
+        code: 400,
         message: "文件夹名称和知识库ID不能为空",
+        data: null,
       });
     }
 
     // 检查用户是否有权限在该知识库中创建文件夹
     const hasAccess = await checkKnowledgeBaseAccess(userId, knowledgeBaseId);
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
+      return res.status(200).json({
+        code: 403,
         message: "没有权限在该知识库中创建文件夹",
+        data: null,
       });
     }
 
@@ -99,15 +106,17 @@ const createFolder = async (req, res) => {
         where: { id: parentFolderId, isActive: true },
       });
       if (!parentFolder) {
-        return res.status(400).json({
-          success: false,
+        return res.status(200).json({
+          code: 400,
           message: "父文件夹不存在",
+          data: null,
         });
       }
       if (parentFolder.knowledgeBaseId !== knowledgeBaseId) {
-        return res.status(400).json({
-          success: false,
+        return res.status(200).json({
+          code: 400,
           message: "父文件夹不属于当前知识库",
+          data: null,
         });
       }
     }
@@ -118,16 +127,17 @@ const createFolder = async (req, res) => {
       parentFolderId: parentFolderId || null, // 支持根目录
     });
 
-    res.status(201).json({
-      success: true,
-      data: folder,
+    res.status(200).json({
+      code: 200,
       message: "文件夹创建成功",
+      data: folder,
     });
   } catch (error) {
     console.error("创建文件夹失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "创建文件夹失败",
+      data: null,
     });
   }
 };
@@ -144,9 +154,10 @@ const deleteFolder = async (req, res) => {
     });
 
     if (!folder) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "文件夹不存在",
+        data: null,
       });
     }
 
@@ -156,9 +167,10 @@ const deleteFolder = async (req, res) => {
       folder.knowledgeBaseId
     );
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
+      return res.status(200).json({
+        code: 403,
         message: "没有权限删除该文件夹",
+        data: null,
       });
     }
 
@@ -166,14 +178,16 @@ const deleteFolder = async (req, res) => {
     await folder.update({ isActive: false });
 
     res.json({
-      success: true,
+      code: 200,
       message: "文件夹删除成功",
+      data: null,
     });
   } catch (error) {
     console.error("删除文件夹失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "删除文件夹失败",
+      data: null,
     });
   }
 };
@@ -186,9 +200,10 @@ const updateFolderName = async (req, res) => {
     const userId = req.user.id;
 
     if (!name) {
-      return res.status(400).json({
-        success: false,
+      return res.status(200).json({
+        code: 400,
         message: "文件夹名称不能为空",
+        data: null,
       });
     }
 
@@ -198,9 +213,10 @@ const updateFolderName = async (req, res) => {
     });
 
     if (!folder) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        code: 404,
         message: "文件夹不存在",
+        data: null,
       });
     }
 
@@ -210,24 +226,26 @@ const updateFolderName = async (req, res) => {
       folder.knowledgeBaseId
     );
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
+      return res.status(200).json({
+        code: 403,
         message: "没有权限编辑该文件夹",
+        data: null,
       });
     }
 
     await folder.update({ name });
 
     res.json({
-      success: true,
-      data: folder,
+      code: 200,
       message: "文件夹名称更新成功",
+      data: folder,
     });
   } catch (error) {
     console.error("更新文件夹名称失败:", error);
-    res.status(500).json({
-      success: false,
+    res.status(200).json({
+      code: 500,
       message: "更新文件夹名称失败",
+      data: null,
     });
   }
 };
