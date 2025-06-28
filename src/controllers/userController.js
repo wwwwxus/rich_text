@@ -126,43 +126,46 @@ const getProfile = async (req, res) => {
 // 根据邮箱搜索用户（以便添加协作）
 const searchUserByEmail = async (req, res) => {
   try {
-    const { email } = req.query;
-    
-
-    if (!email) {
+    const { email, knowledgeBaseId } = req.query;
+    if (!email || !knowledgeBaseId) {
       return res.status(200).json({
         code: 400,
-        message: "邮箱参数不能为空",
+        message: "邮箱和知识库ID参数不能为空",
         data: null,
       });
     }
 
-    // 使用子查询判断用户是否在Collaboration表中
-    const { sequelize } = User;
+    // 获取知识库ownerId
+    const knowledgeBase = await require("../models/KnowledgeBase").findOne({
+      where: { id: knowledgeBaseId },
+      attributes: ["ownerId"],
+    });
+    if (!knowledgeBase) {
+      return res.status(200).json({
+        code: 404,
+        message: "知识库不存在",
+        data: null,
+      });
+    }
+    const ownerId = knowledgeBase.ownerId;
+
+    // 获取协作者userId列表
+    const collaborations = await Collaboration.findAll({
+      where: { knowledgeBaseId },
+      attributes: ["userId"],
+    });
+    const collaboratorIds = collaborations.map((c) => c.userId);
+
+    // 查询不是owner且不是协作者的用户
     const users = await User.findAll({
       where: {
-        email: {
-          [Op.like]: `%${email}%`,
-        },
+        email: { [Op.like]: `%${email}%` },
         isActive: true,
-        id: { [Op.ne]: req.user.id }, // 排除自己
+        id: {
+          [Op.notIn]: [ownerId, ...collaboratorIds, req.user.id], // 排除owner、协作者、自己
+        },
       },
-      attributes: [
-        "id",
-        "username",
-        "email",
-        // 优先级字段：未在Collaboration表中的优先级高
-        [
-          sequelize.literal(
-            `NOT EXISTS (SELECT 1 FROM Collaborations WHERE Collaborations.userId = User.id)`
-          ),
-          "priority",
-        ],
-      ],
-      order: [
-        [sequelize.literal("priority"), "DESC"],
-        ["id", "ASC"],
-      ],
+      attributes: ["id", "username"],
       limit: 3,
     });
 
