@@ -509,6 +509,27 @@ const checkKnowledgeBaseAccess = async (userId, knowledgeBaseId) => {
   }
 };
 
+// 检查用户是否有权限访问知识库
+const checkKnowledgeBaseAuth = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const knowledgeBaseId = req.params.knowledgeBaseId;
+    const result = await checkKnowledgeBaseAccess(userId, knowledgeBaseId);
+    res.status(200).json({
+      code: 200,
+      message: result === true ? "有权限访问" : "没有权限访问",
+      data: result,
+    });
+  } catch (error) {
+    console.error("检查知识库访问权限失败:", error);
+    res.status(500).json({
+      code: 500,
+      message: "检查知识库访问权限失败",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   getAccessibleKnowledgeBases,
   getKnowledgeBaseContent,
@@ -517,4 +538,5 @@ module.exports = {
   updateKnowledgeBase,
   inviteCollaboration,
   getRecentKnowledgeBases,
+  checkKnowledgeBaseAuth,
 };

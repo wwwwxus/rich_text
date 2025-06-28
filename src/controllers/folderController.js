@@ -2,6 +2,7 @@ const Folder = require("../models/Folder");
 const Document = require("../models/Document");
 const KnowledgeBase = require("../models/KnowledgeBase");
 const Collaboration = require("../models/Collaboration");
+const OpenAI = require("openai");
 
 // 根据文件夹id获取第一层文档和文件夹id
 const getFolderContent = async (req, res) => {
@@ -173,8 +174,21 @@ const deleteFolder = async (req, res) => {
       });
     }
 
-    // 软删除文件夹
-    await folder.update({ isActive: false });
+    // 递归软删除子文件夹和文档
+    async function recursiveDelete(folderId) {
+      // 软删除当前文件夹
+      await Folder.update({ isActive: false }, { where: { id: folderId } });
+      // 软删除该文件夹下的所有文档
+      await Document.update({ isActive: false }, { where: { folderId } });
+      // 查找所有子文件夹
+      const subFolders = await Folder.findAll({
+        where: { parentFolderId: folderId, isActive: true },
+      });
+      for (const sub of subFolders) {
+        await recursiveDelete(sub.id);
+      }
+    }
+    await recursiveDelete(folder.id);
 
     res.json({
       code: 200,
@@ -279,9 +293,52 @@ const checkKnowledgeBaseAccess = async (userId, knowledgeBaseId) => {
   }
 };
 
+// AI 文档摘要接口
+const generateSummary = async (req, res) => {
+  try {
+    const { documentText } = req.body;
+    if (!documentText) {
+      return res.status(200).json({
+        code: 400,
+        message: "文档内容不能为空",
+        data: null,
+      });
+    }
+    const openai = new OpenAI({
+      apiKey: process.env.VOLC_ENGINE_API_KEY, // 从环境变量获取
+      baseURL: "https://ark.cn-beijing.volces.com/api/v3",
+    });
+    const response = await openai.chat.completions.create({
+      model: "ep-20250627232809-8d2lz",
+      messages: [
+        {
+          role: "user",
+          content: `请对以下文档进行摘要，控制在300字内：\n${documentText}`,
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 50,
+    });
+    const summary = response.choices?.[0]?.message?.content || "";
+    res.status(200).json({
+      code: summary ? 200 : 500,
+      message: summary ? "摘要生成成功" : "AI未返回摘要内容",
+      data: summary ? { summary } : null,
+    });
+  } catch (error) {
+    console.error("API调用失败：", error);
+    res.status(200).json({
+      code: 500,
+      message: "摘要生成失败",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   getFolderContent,
   createFolder,
   deleteFolder,
   updateFolderName,
+  generateSummary,
 };
