@@ -174,8 +174,21 @@ const deleteFolder = async (req, res) => {
       });
     }
 
-    // 软删除文件夹
-    await folder.update({ isActive: false });
+    // 递归软删除子文件夹和文档
+    async function recursiveDelete(folderId) {
+      // 软删除当前文件夹
+      await Folder.update({ isActive: false }, { where: { id: folderId } });
+      // 软删除该文件夹下的所有文档
+      await Document.update({ isActive: false }, { where: { folderId } });
+      // 查找所有子文件夹
+      const subFolders = await Folder.findAll({
+        where: { parentFolderId: folderId, isActive: true },
+      });
+      for (const sub of subFolders) {
+        await recursiveDelete(sub.id);
+      }
+    }
+    await recursiveDelete(folder.id);
 
     res.json({
       code: 200,
