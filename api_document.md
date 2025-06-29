@@ -1,19 +1,19 @@
-# ���ı�֪ʶ��API�ĵ�
+# 富文本知识库API文档
 
-## ����
-����һ�����ı��ĵ�֪ʶ��ϵͳ��API�ӿ��ĵ���֧���ĵ��������ı����ۺͰ汾���ƹ��ܡ�
+## 概述
+这是一个富文本文档知识库系统的API接口文档，支持文档管理、文本评论和版本控制功能。
 
-## ������Ϣ
-- **����URL**: `http://localhost:3300/api`
-- **��Ӧ��ʽ**: ���нӿ�ͳһ���� `{ code, message, data }` ��ʽ
-- **��֤��ʽ**: ���ֽӿ���Ҫ�û���֤
+## 基础信息
+- **基础URL**: `http://localhost:3300/api`
+- **响应格式**: 所有接口统一返回 `{ code, message, data }` 格式
+- **认证方式**: 部分接口需要用户认证
 
-## 1. �û������ӿ�
+## 1. 用户管理接口
 
-### 1.1 �û�ע��
+### 1.1 用户注册
 - **URL**: `POST /api/users/register`
-- **����**: ע�����û�
-- **������**:
+- **描述**: 注册新用户
+- **请求体**:
 ```json
 {
   "username": "testuser",
@@ -21,11 +21,11 @@
   "password": "password123"
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�û�ע��ɹ�",
+  "message": "用户注册成功",
   "data": {
     "id": 1,
     "username": "testuser",
@@ -35,21 +35,21 @@
 }
 ```
 
-### 1.2 �û���¼
+### 1.2 用户登录
 - **URL**: `POST /api/users/login`
-- **����**: �û���¼
-- **������**:
+- **描述**: 用户登录
+- **请求体**:
 ```json
 {
   "email": "test@example.com",
   "password": "password123"
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��¼�ɹ�",
+  "message": "登录成功",
   "data": {
     "token": "jwt_token_here",
     "user": {
@@ -61,47 +61,47 @@
 }
 ```
 
-## 2. ֪ʶ������ӿ�
+## 2. 知识库管理接口
 
-### 2.1 ����֪ʶ��
+### 2.1 创建知识库
 - **URL**: `POST /api/knowledgeBase/create`
-- **����**: �����µ�֪ʶ��
-- **������**:
+- **描述**: 创建新的知识库
+- **请求体**:
 ```json
 {
-  "name": "�ҵ�֪ʶ��",
-  "description": "����һ������֪ʶ��",
+  "name": "我的知识库",
+  "description": "这是一个测试知识库",
   "ownerId": 1
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "֪ʶ�ⴴ���ɹ�",
+  "message": "知识库创建成功",
   "data": {
     "id": 1,
-    "name": "�ҵ�֪ʶ��",
-    "description": "����һ������֪ʶ��",
+    "name": "我的知识库",
+    "description": "这是一个测试知识库",
     "ownerId": 1,
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### 2.2 ��ȡ�û���֪ʶ���б�
+### 2.2 获取用户的知识库列表
 - **URL**: `GET /api/knowledgeBase/user/:userId`
-- **����**: ��ȡָ���û���֪ʶ���б�
-- **����**:
+- **描述**: 获取指定用户的知识库列表
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ֪ʶ���б��ɹ�",
+  "message": "获取知识库列表成功",
   "data": [
     {
       "id": 1,
-      "name": "�ҵ�֪ʶ��",
-      "description": "����һ������֪ʶ��",
+      "name": "我的知识库",
+      "description": "这是一个测试知识库",
       "ownerId": 1,
       "createdAt": "2024-01-01T00:00:00.000Z"
     }
@@ -109,36 +109,36 @@
 }
 ```
 
-## 3. �ĵ������ӿ�
+## 3. 文档管理接口
 
-### 3.1 �����ĵ�
+### 3.1 创建文档
 - **URL**: `POST /api/documents/create`
-- **����**: �����µ��ĵ�
-- **������**:
+- **描述**: 创建新的文档
+- **请求体**:
 ```json
 {
-  "title": "�ĵ�����",
-  "content": "�ĵ����ݣ���ѡ��",
+  "title": "文档标题",
+  "content": "文档内容（可选）",
   "ownerId": 1,
   "knowledgeBaseId": 1,
   "folderId": 1
 }
 ```
-- **����˵��**:
-  - `title` (����): �ĵ�����
-  - `content` (��ѡ): �ĵ����ݣ�Ĭ��Ϊ���ַ���
-  - `ownerId` (����): �ĵ�ӵ����ID
-  - `knowledgeBaseId` (����): ����֪ʶ��ID
-  - `folderId` (��ѡ): �����ļ���ID��Ĭ��Ϊnull
-- **����**:
+- **参数说明**:
+  - `title` (必填): 文档标题
+  - `content` (可选): 文档内容，默认为空字符串
+  - `ownerId` (必填): 文档拥有者ID
+  - `knowledgeBaseId` (必填): 所属知识库ID
+  - `folderId` (可选): 所属文件夹ID，默认为null
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�ĵ������ɹ�",
+  "message": "文档创建成功",
   "data": {
     "id": 1,
-    "title": "�ĵ�����",
-    "content": "�ĵ�����",
+    "title": "文档标题",
+    "content": "文档内容",
     "ownerId": 1,
     "knowledgeBaseId": 1,
     "folderId": 1,
@@ -148,24 +148,24 @@
 }
 ```
 
-### 3.2 ��ȡ�ĵ��б�
+### 3.2 获取文档列表
 - **URL**: `GET /api/documents/list/:knowledgeBaseId`
 - **URL**: `GET /api/documents/list/:knowledgeBaseId/:userId`
-- **����**: ��ȡָ��֪ʶ����ĵ��б�
-- **����**:
-  - `knowledgeBaseId` (·������): ֪ʶ��ID
-  - `userId` (��ѡ·������): �û�ID������ṩ��ֻ���ظ��û�ӵ�е��ĵ�
-- **����**:
+- **描述**: 获取指定知识库的文档列表
+- **参数**:
+  - `knowledgeBaseId` (路径参数): 知识库ID
+  - `userId` (可选路径参数): 用户ID，如果提供则只返回该用户拥有的文档
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�ĵ��б��ɹ�",
+  "message": "获取文档列表成功",
   "data": [
     {
       "id": 1,
-      "title": "�ĵ�����",
+      "title": "文档标题",
       "ownerId": 1,
-      "ownerName": "�û���",
+      "ownerName": "用户名",
       "knowledgeBaseId": 1,
       "folderId": 1,
       "createdAt": "2024-01-01T00:00:00.000Z",
@@ -175,18 +175,18 @@
 }
 ```
 
-### 3.3 ��ȡ�ĵ�����
+### 3.3 获取文档内容
 - **URL**: `GET /api/documents/:documentId/:userId`
-- **����**: ��ȡָ���ĵ�������
-- **����**:
+- **描述**: 获取指定文档的内容
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�ĵ��ɹ�",
+  "message": "获取文档成功",
   "data": {
     "id": 1,
-    "title": "�����ĵ�",
-    "content": "�ĵ�����...",
+    "title": "测试文档",
+    "content": "文档内容...",
     "knowledgeBaseId": 1,
     "folderId": 1,
     "ownerId": 1,
@@ -196,72 +196,72 @@
 }
 ```
 
-### 3.4 ���渻�ı�
+### 3.4 保存富文本
 - **URL**: `POST /api/documents/save`
-- **����**: �����ĵ��ĸ��ı����ݣ��Զ������°汾��
-- **������**:
+- **描述**: 保存文档的富文本内容（自动创建新版本）
+- **请求体**:
 ```json
 {
   "userId": 1,
   "documentId": 1,
-  "newContent": "���º���ĵ�����",
+  "newContent": "更新后的文档内容",
   "updateTime": "2024-01-01T00:00:00.000Z"
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�ĵ�����ɹ�",
+  "message": "文档保存成功",
   "data": {
     "documentId": 1,
     "versionNumber": 2,
-    "diff": "�������� 50 ���ַ�",
+    "diff": "内容增加 50 个字符",
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### 3.5 ɾ���ĵ�
+### 3.5 删除文档
 - **URL**: `DELETE /api/documents/:documentId/:userId`
-- **����**: ɾ��ָ���ĵ�����ɾ����
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-  - `userId` (·������): �û�ID������Ȩ����֤��
-- **����**:
+- **描述**: 删除指定文档（软删除）
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+  - `userId` (路径参数): 用户ID（用于权限验证）
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�ĵ�ɾ���ɹ�",
+  "message": "文档删除成功",
   "data": null
 }
 ```
 
-## 4. �ı����۽ӿ�
+## 4. 文本评论接口
 
-### 4.1 ѡ���ı�����
+### 4.1 选中文本评论
 - **URL**: `POST /api/text-comments/add`
-- **����**: Ϊѡ�е��ı���������
-- **������**:
+- **描述**: 为选中的文本添加评论
+- **请求体**:
 ```json
 {
   "textNanoid": "unique_text_id",
-  "textContent": "��ѡ�е��ı�����",
-  "comment": "��������",
+  "textContent": "被选中的文本内容",
+  "comment": "评论内容",
   "userId": 1,
   "documentId": 1
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�ı��������ӳɹ�",
+  "message": "文本评论添加成功",
   "data": {
     "id": 1,
     "textNanoid": "unique_text_id",
-    "textContent": "��ѡ�е��ı�����",
-    "comment": "��������",
+    "textContent": "被选中的文本内容",
+    "comment": "评论内容",
     "userId": 1,
     "documentId": 1,
     "createdAt": "2024-01-01T00:00:00.000Z"
@@ -269,28 +269,28 @@
 }
 ```
 
-#### textNanoid ����˵��
-`textNanoid` ��ǰ�����û�ѡ���ı�ʱ��̬���ɵ�Ψһ��ʶ�������ڱ�ʶ�ض����ı�Ƭ�Ρ�
+#### textNanoid 参数说明
+`textNanoid` 是前端在用户选中文本时动态生成的唯一标识符，用于标识特定的文本片段。
 
-**���ɹ���**:
-- ��ʽ: `text_{����ַ���}_{ʱ���}`
-- ʾ��: `text_ABC123DEF_1704067200000`
-- ����: ͨ��20-30���ַ�
+**生成规则**:
+- 格式: `text_{随机字符串}_{时间戳}`
+- 示例: `text_ABC123DEF_1704067200000`
+- 长度: 通常20-30个字符
 
-**ǰ��ʵ�ֲ���**:
-1. �����ı�ѡ���¼� (`mouseup` �� `selectionchange`)
-2. ��ȡѡ�е��ı�����
-3. ����Ψһ�� `textNanoid`
-4. ��ʾ���۰�ť��Ի���
-5. �û��������ۺ󣬽� `textNanoid` ����������һ���͵�API
+**前端实现步骤**:
+1. 监听文本选中事件 (`mouseup` 或 `selectionchange`)
+2. 获取选中的文本内容
+3. 生成唯一的 `textNanoid`
+4. 显示评论按钮或对话框
+5. 用户输入评论后，将 `textNanoid` 和评论内容一起发送到API
 
-**����ʾ������**:
+**生成示例代码**:
 ```javascript
-// ʹ�� nanoid ��
+// 使用 nanoid 库
 import { nanoid } from 'nanoid';
 const textNanoid = `text_${nanoid(10)}_${Date.now()}`;
 
-// ��ʹ���Զ��庯��
+// 或使用自定义函数
 function generateTextNanoid() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = 'text_';
@@ -302,120 +302,120 @@ function generateTextNanoid() {
 }
 ```
 
-**ʹ�ó���**:
-- �û�ѡ���ĵ��е�һ���ı�
-- ǰ������Ψһ�� `textNanoid`
-- �û�������۰�ť��������������
-- ǰ�˽� `textNanoid`��ѡ�е��ı����ݡ���������һ���͵����
-- ��˱������ۣ�����ͨ�� `textNanoid` ������������ı�Ƭ��
+**使用场景**:
+- 用户选中文档中的一段文本
+- 前端生成唯一的 `textNanoid`
+- 用户点击评论按钮，输入评论内容
+- 前端将 `textNanoid`、选中的文本内容、评论内容一起发送到后端
+- 后端保存评论，可以通过 `textNanoid` 关联到具体的文本片段
 
-### 4.2 ��ȡ�ı�����
+### 4.2 获取文本评论
 - **URL**: `GET /api/text-comments/:textNanoid`
-- **����**: ��ȡָ���ı�Ƭ�ε���������
-- **����**:
-  - `textNanoid` (·������): �ı���Ψһ��ʶ
-- **����**:
+- **描述**: 获取指定文本片段的所有评论
+- **参数**:
+  - `textNanoid` (路径参数): 文本的唯一标识
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�ı����۳ɹ�",
+  "message": "获取文本评论成功",
   "data": [
     {
       "id": 1,
-      "textContent": "��ѡ�е��ı�����",
-      "comment": "��������",
+      "textContent": "被选中的文本内容",
+      "comment": "评论内容",
       "userId": 1,
-      "username": "�û���",
+      "username": "用户名",
       "createdAt": "2024-01-01T00:00:00.000Z"
     }
   ]
 }
 ```
 
-### 4.3 ��ȡ�ĵ��������ı�����
+### 4.3 获取文档的所有文本评论
 - **URL**: `GET /api/text-comments/document/:documentId`
-- **����**: ��ȡָ���ĵ��������ı�����
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-- **����**:
+- **描述**: 获取指定文档的所有文本评论
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�ĵ��ı����۳ɹ�",
+  "message": "获取文档文本评论成功",
   "data": [
     {
       "id": 1,
       "textNanoid": "unique_text_id",
-      "textContent": "��ѡ�е��ı�����",
-      "comment": "��������",
+      "textContent": "被选中的文本内容",
+      "comment": "评论内容",
       "userId": 1,
-      "username": "�û���",
+      "username": "用户名",
       "createdAt": "2024-01-01T00:00:00.000Z"
     }
   ]
 }
 ```
 
-### 4.4 ɾ���ı�����
+### 4.4 删除文本评论
 - **URL**: `DELETE /api/text-comments/:commentId`
-- **����**: ɾ��ָ�����ı����ۣ�ֻ�з����߿���ɾ����
-- **����**:
-  - `commentId` (·������): ����ID
-- **������**:
+- **描述**: 删除指定的文本评论（只有发布者可以删除）
+- **参数**:
+  - `commentId` (路径参数): 评论ID
+- **请求体**:
 ```json
 {
   "userId": 1
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "����ɾ���ɹ�",
+  "message": "评论删除成功",
   "data": {
     "deletedCommentId": 1
   }
 }
 ```
 
-## 5. �汾�����ӿ�
+## 5. 版本管理接口
 
-### �汾����˵��
-�汾��������**�Զ��汾����**���ƣ�
-- ÿ�α����ĵ�ʱ��ϵͳ�Զ������°汾
-- �汾���Զ������������û�ָ��
-- ϵͳ�Զ���������һ�汾�Ĳ���
-- �û������ֶ������汾��
+### 版本管理说明
+版本管理采用**自动版本控制**机制：
+- 每次保存文档时，系统自动创建新版本
+- 版本号自动递增，无需用户指定
+- 系统自动计算与上一版本的差异
+- 用户无需手动管理版本号
 
-### 5.1 �鿴�汾�б�
+### 5.1 查看版本列表
 - **URL**: `GET /api/versions/:documentId`
-- **����**: ��ȡָ���ĵ������а汾�б�
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-- **����**:
+- **描述**: 获取指定文档的所有版本列表
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�汾�б��ɹ�",
+  "message": "获取版本列表成功",
   "data": [
     {
       "id": 1,
       "versionNumber": 3,
-      "diff": "�������� 50 ���ַ�",
+      "diff": "内容增加 50 个字符",
       "savedAt": "2024-01-01T00:00:00.000Z",
       "createdAt": "2024-01-01T00:00:00.000Z"
     },
     {
       "id": 2,
       "versionNumber": 2,
-      "diff": "���ݱ��޸�",
+      "diff": "内容被修改",
       "savedAt": "2024-01-01T00:00:00.000Z",
       "createdAt": "2024-01-01T00:00:00.000Z"
     },
     {
       "id": 3,
       "versionNumber": 1,
-      "diff": "��ʼ�汾",
+      "diff": "初始版本",
       "savedAt": "2024-01-01T00:00:00.000Z",
       "createdAt": "2024-01-01T00:00:00.000Z"
     }
@@ -423,109 +423,109 @@ function generateTextNanoid() {
 }
 ```
 
-### 5.2 ��ȡ�ض��汾����
+### 5.2 获取特定版本内容
 - **URL**: `GET /api/versions/:documentId/:versionNumber`
-- **����**: ��ȡָ���ĵ����ض��汾����
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-  - `versionNumber` (·������): �汾��
-- **����**:
+- **描述**: 获取指定文档的特定版本内容
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+  - `versionNumber` (路径参数): 版本号
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�汾���ݳɹ�",
+  "message": "获取版本内容成功",
   "data": {
     "id": 1,
     "documentId": 1,
     "versionNumber": 2,
-    "content": "�汾����",
-    "diff": "����һ�汾�Ĳ��",
+    "content": "版本内容",
+    "diff": "与上一版本的差别",
     "savedAt": "2024-01-01T00:00:00.000Z",
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### 5.3 ���˰汾
+### 5.3 回退版本
 - **URL**: `POST /api/versions/:documentId/:versionNumber/rollback`
-- **����**: ���ĵ����˵�ָ���汾
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-  - `versionNumber` (·������): Ŀ��汾��
-- **������**:
+- **描述**: 将文档回退到指定版本
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+  - `versionNumber` (路径参数): 目标版本号
+- **请求体**:
 ```json
 {
   "userId": 1
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�汾���˳ɹ�",
+  "message": "版本回退成功",
   "data": {
     "documentId": 1,
     "rollbackToVersion": 2,
     "newVersionNumber": 4,
-    "content": "���˺������",
+    "content": "回退后的内容",
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-### 5.4 ɾ���汾
+### 5.4 删除版本
 - **URL**: `DELETE /api/versions/:documentId/:versionNumber`
-- **����**: ɾ��ָ���ĵ����ض��汾��ֻ��ӵ���߿���ɾ����
-- **����**:
-  - `documentId` (·������): �ĵ�ID
-  - `versionNumber` (·������): �汾��
-- **������**:
+- **描述**: 删除指定文档的特定版本（只有拥有者可以删除）
+- **参数**:
+  - `documentId` (路径参数): 文档ID
+  - `versionNumber` (路径参数): 版本号
+- **请求体**:
 ```json
 {
   "userId": 1
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�汾ɾ���ɹ�",
+  "message": "版本删除成功",
   "data": {
     "deletedVersionNumber": 2
   }
 }
 ```
 
-### �汾����˵��
-ϵͳ���Զ�����汾��Ĳ��죬�����Ĳ�������������
-- `��ʼ�汾`: �ĵ��ĵ�һ���汾
-- `�����ޱ仯`: ����ʱ����û�б仯
-- `�������� X ���ַ�`: ���ݳ�������
-- `���ݼ��� X ���ַ�`: ���ݳ��ȼ���
-- `���ݱ��޸�`: ���ݱ��޸ĵ�������ͬ
-- `���˵��汾 X`: ͨ�����˲��������İ汾
+### 版本差异说明
+系统会自动计算版本间的差异，常见的差异描述包括：
+- `初始版本`: 文档的第一个版本
+- `内容无变化`: 保存时内容没有变化
+- `内容增加 X 个字符`: 内容长度增加
+- `内容减少 X 个字符`: 内容长度减少
+- `内容被修改`: 内容被修改但长度相同
+- `回退到版本 X`: 通过回退操作创建的版本
 
-## 6. �ļ��й����ӿ�
+## 6. 文件夹管理接口
 
-### 6.1 �����ļ���
+### 6.1 创建文件夹
 - **URL**: `POST /api/folders/create`
-- **����**: �������ļ���
-- **������**:
+- **描述**: 创建新文件夹
+- **请求体**:
 ```json
 {
-  "name": "�����ļ���",
+  "name": "测试文件夹",
   "knowledgeBaseId": 1,
   "parentFolderId": null
 }
 ```
-- **����**:
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "�ļ��д����ɹ�",
+  "message": "文件夹创建成功",
   "data": {
     "id": 1,
-    "name": "�����ļ���",
+    "name": "测试文件夹",
     "knowledgeBaseId": 1,
     "parentFolderId": null,
     "createdAt": "2024-01-01T00:00:00.000Z"
@@ -533,18 +533,18 @@ function generateTextNanoid() {
 }
 ```
 
-### 6.2 ��ȡ�ļ����б�
+### 6.2 获取文件夹列表
 - **URL**: `GET /api/folders/:knowledgeBaseId`
-- **����**: ��ȡָ��֪ʶ����ļ����б�
-- **����**:
+- **描述**: 获取指定知识库的文件夹列表
+- **返回**:
 ```json
 {
   "code": 200,
-  "message": "��ȡ�ļ����б��ɹ�",
+  "message": "获取文件夹列表成功",
   "data": [
     {
       "id": 1,
-      "name": "�����ļ���",
+      "name": "测试文件夹",
       "knowledgeBaseId": 1,
       "parentFolderId": null,
       "createdAt": "2024-01-01T00:00:00.000Z"
@@ -553,36 +553,36 @@ function generateTextNanoid() {
 }
 ```
 
-## ������Ӧ��ʽ
-���нӿ��ڷ�������ʱ���᷵�����¸�ʽ��
+## 错误响应格式
+所有接口在发生错误时都会返回以下格式：
 ```json
 {
   "code": 400,
-  "message": "����������Ϣ",
+  "message": "错误描述信息",
   "data": null
 }
 ```
 
-## ����������
-- `400`: �����������
-- `401`: δ��Ȩ����
-- `404`: ��Դ������
-- `500`: �������ڲ�����
+## 常见错误码
+- `400`: 请求参数错误
+- `401`: 未授权访问
+- `404`: 资源不存在
+- `500`: 服务器内部错误
 
-## ����
-����
-����ʹ���ṩ�� test_api.js �ļ����������нӿڹ��ܡ�
-�ܽ�
-���Ѿ�������API�ĵ��е��ظ����ݣ����ڵ��ĵ��ṹ������û���ظ��Ľӿ�˵����
-? ������������
-ɾ�����ظ����ĵ������ӿ� - ֻ���������������İ汾
-ͳһ�˽ӿڱ�� - ���չ���ģ�����±��
-���������б�Ҫ�Ľӿ� - ������Ҫ�����ӵĴ����ĵ��ͻ�ȡ�ĵ��б��ӿ�
-�����˰汾�����ӿ� - ��ӳ�µ��Զ��汾��������
-?? ��ǰ�ĵ��ṹ
-�û������ӿ� (1.x)
-֪ʶ������ӿ� (2.x)
-�ĵ������ӿ� (3.x) - �����������б�����ȡ�����桢ɾ��
-�ı����۽ӿ� (4.x) - �������ӡ���ȡ��ɾ������
-�汾�����ӿ� (5.x) - �Զ��汾����
-�ļ��й����ӿ� (6.x)
+## 测试
+测试
+可以使用提供的 test_api.js 文件来测试所有接口功能。
+总结
+我已经清理了API文档中的重复内容，现在的文档结构清晰，没有重复的接口说明：
+? 已清理的内容
+删除了重复的文档管理接口 - 只保留最新最完整的版本
+统一了接口编号 - 按照功能模块重新编号
+保留了所有必要的接口 - 包括你要求添加的创建文档和获取文档列表接口
+更新了版本管理接口 - 反映新的自动版本管理机制
+?? 当前文档结构
+用户管理接口 (1.x)
+知识库管理接口 (2.x)
+文档管理接口 (3.x) - 包含创建、列表、获取、保存、删除
+文本评论接口 (4.x) - 包含添加、获取、删除评论
+版本管理接口 (5.x) - 自动版本管理
+文件夹管理接口 (6.x)
