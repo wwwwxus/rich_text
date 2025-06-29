@@ -1,7 +1,6 @@
 const TextComment = require('../models/TextComment');
 const User = require('../models/User');
 const Document = require('../models/Document');
-const { nanoid } = require('nanoid');
 
 // 删除评论
 const deleteComment = async (req, res) => {

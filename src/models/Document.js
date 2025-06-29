@@ -18,7 +18,7 @@ const Document = sequelize.define('Document', {
   ownerId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    comment: 'ÎÄµµÓµÓÐÕßID'
+    comment: 'ç”¨æˆ·id'
   },
   knowledgeBaseId: {
     type: DataTypes.INTEGER,
