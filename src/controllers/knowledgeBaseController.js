@@ -539,4 +539,5 @@ module.exports = {
   inviteCollaboration,
   getRecentKnowledgeBases,
   checkKnowledgeBaseAuth,
+  checkKnowledgeBaseAccess
 };
