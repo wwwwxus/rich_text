@@ -6,7 +6,8 @@ const Document = require('../models/Document');
 const deleteComment = async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { userId } = req.body; // 从请求体中获取用户ID
+    const { textNanoid } = req.body; // 需要前端传递 textNanoid
+    const userId = req.user.id; // 从 token 获取
 
     const comment = await TextComment.findOne({
       where: {
@@ -33,9 +34,18 @@ const deleteComment = async (req, res) => {
     // 软删除评论
     await comment.update({ isActive: false });
 
+    // 查询剩余评论条数
+    const remainCount = await TextComment.count({
+      where: {
+        textNanoid: textNanoid || comment.textNanoid,
+        isActive: true
+      }
+    });
+
     res.json({
       code: 200,
-      message: '评论删除成功'
+      message: '评论删除成功',
+      remainCount // 剩余评论条数
     });
   } catch (error) {
     console.error('删除评论错误:', error);
@@ -49,7 +59,8 @@ const deleteComment = async (req, res) => {
 // 选中文本评论
 const addTextComment = async (req, res) => {
   try {
-    const { textNanoid, textContent, comment, userId, documentId } = req.body;
+    const { textNanoid, comment, documentId } = req.body;
+    const userId = req.user.id; // 从 token 获取
 
     // 验证文档是否存在
     const document = await Document.findOne({
@@ -78,7 +89,6 @@ const addTextComment = async (req, res) => {
     // 创建文本评论
     const newComment = await TextComment.create({
       textNanoid,
-      textContent,
       comment,
       userId,
       documentId
@@ -90,7 +100,6 @@ const addTextComment = async (req, res) => {
       data: {
         id: newComment.id,
         textNanoid: newComment.textNanoid,
-        textContent: newComment.textContent,
         comment: newComment.comment,
         userId: newComment.userId,
         documentId: newComment.documentId,
@@ -127,7 +136,6 @@ const getTextComments = async (req, res) => {
 
     const formattedComments = comments.map(comment => ({
       id: comment.id,
-      textContent: comment.textContent,
       comment: comment.comment,
       userId: comment.userId,
       username: comment.User?.username,
@@ -170,7 +178,6 @@ const getDocumentTextComments = async (req, res) => {
     const formattedComments = comments.map(comment => ({
       id: comment.id,
       textNanoid: comment.textNanoid,
-      textContent: comment.textContent,
       comment: comment.comment,
       userId: comment.userId,
       username: comment.User?.username,
@@ -196,4 +203,4 @@ module.exports = {
   addTextComment,
   getTextComments,
   getDocumentTextComments
-}; 
+};
