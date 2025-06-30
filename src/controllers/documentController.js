@@ -25,18 +25,18 @@ const getDocumentContent = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
     // 检查用户是否有权限访问（拥有者或协作者）
     const hasAccess = await checkDocumentAccess(documentId, userId);
     if (!hasAccess) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         code: 403,
-        message: '没有权限访问此文档' 
+        message: '没有权限访问此文档'
       });
     }
 
@@ -54,10 +54,10 @@ const getDocumentContent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('获取文档内容错误:', error);
-    res.status(500).json({ 
+    console.error('获取文档内容错误:', error, error.message, error.stack);
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -75,18 +75,18 @@ const saveDocument = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
     // 检查用户是否有权限编辑
     const hasEditAccess = await checkDocumentEditAccess(documentId, userId);
     if (!hasEditAccess) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         code: 403,
-        message: '没有权限编辑此文档' 
+        message: '没有权限编辑此文档'
       });
     }
 
@@ -110,10 +110,10 @@ const saveDocument = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('保存文档错误:', error);
-    res.status(500).json({ 
+    console.error('保存文档错误:', error, error.message, error.stack);
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -131,17 +131,17 @@ const deleteDocument = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
     // 只有拥有者才能删除
     if (document.ownerId !== parseInt(userId)) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         code: 403,
-        message: '只有文档拥有者才能删除文档' 
+        message: '只有文档拥有者才能删除文档'
       });
     }
 
@@ -164,10 +164,10 @@ const deleteDocument = async (req, res) => {
       message: '文档删除成功'
     });
   } catch (error) {
-    console.error('删除文档错误:', error);
-    res.status(500).json({ 
+    console.error('删除文档错误:', error, error.message, error.stack);
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -190,7 +190,7 @@ const checkDocumentAccess = async (documentId, userId) => {
     // 暂时返回false，你可以根据实际需求修改
     return false;
   } catch (error) {
-    console.error('检查文档访问权限错误:', error);
+    console.error('检查文档访问权限错误:', error, error.message, error.stack);
     return false;
   }
 };
@@ -213,7 +213,7 @@ const checkDocumentEditAccess = async (documentId, userId) => {
     // 暂时返回false，你可以根据实际需求修改
     return false;
   } catch (error) {
-    console.error('检查文档编辑权限错误:', error);
+    console.error('检查文档编辑权限错误:', error, error.message, error.stack);
     return false;
   }
 };
@@ -274,7 +274,7 @@ const createDocument = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('创建文档错误:', error);
+    console.error('创建文档错误:', error, error.message, error.stack);
     res.status(500).json({
       code: 500,
       message: '服务器内部错误'
@@ -325,7 +325,7 @@ const getDocumentList = async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('获取文档列表错误:', error);
+    console.error('获取文档列表错误:', error, error.message, error.stack);
     res.status(500).json({
       code: 500,
       message: '服务器内部错误'

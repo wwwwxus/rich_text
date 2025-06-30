@@ -1,29 +1,35 @@
 const DocumentVersion = require('../models/DocumentVersion');
 const Document = require('../models/Document');
 const { Op } = require('sequelize');
+const auth = require('../middleware/auth');
 
 // 自动创建版本（内部函数，供文档保存时调用）
 const createVersion = async (documentId, content, userId) => {
   try {
-    // 获取最新版本号
-    const latestVersion = await DocumentVersion.findOne({
-      where: { 
-        documentId,
-        isActive: true 
-      },
-      order: [['versionNumber', 'DESC']]
+    // 使用 Sequelize 的 max 函数，直接获取数据库中最大的版本号
+    // 这能确保无论版本是否被软删除，我们总能得到正确的最大值，彻底解决唯一键冲突问题
+    const maxVersionNumber = await DocumentVersion.max('versionNumber', {
+      where: { documentId }
     });
-    
-    const newVersionNumber = (latestVersion?.versionNumber || 0) + 1;
-    
+
+    const newVersionNumber = (maxVersionNumber || 0) + 1;
+
+    // 获取上一个版本的内容用于 diff 计算
+    const previousVersion = await DocumentVersion.findOne({
+      where: {
+        documentId,
+        versionNumber: maxVersionNumber
+      }
+    });
+
     // 计算与上一版本的差异
     let diff = '';
-    if (latestVersion) {
-      diff = calculateDiff(latestVersion.content, content);
+    if (previousVersion) {
+      diff = calculateDiff(previousVersion.content, content);
     } else {
       diff = '初始版本';
     }
-    
+
     // 创建新版本
     const newVersion = await DocumentVersion.create({
       documentId,
@@ -33,7 +39,7 @@ const createVersion = async (documentId, content, userId) => {
       savedAt: new Date(),
       createdBy: userId
     });
-    
+
     return newVersion;
   } catch (error) {
     console.error('创建版本错误:', error);
@@ -45,11 +51,11 @@ const createVersion = async (documentId, content, userId) => {
 const calculateDiff = (oldContent, newContent) => {
   if (!oldContent) return '初始版本';
   if (oldContent === newContent) return '内容无变化';
-  
+
   // 简单的差异计算（实际项目中可以使用更复杂的diff算法）
   const oldLength = oldContent.length;
   const newLength = newContent.length;
-  
+
   if (newLength > oldLength) {
     return `内容增加 ${newLength - oldLength} 个字符`;
   } else if (newLength < oldLength) {
@@ -73,9 +79,9 @@ const getVersions = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
@@ -102,9 +108,9 @@ const getVersions = async (req, res) => {
     });
   } catch (error) {
     console.error('获取版本列表错误:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -123,9 +129,9 @@ const getVersionContent = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
@@ -139,9 +145,9 @@ const getVersionContent = async (req, res) => {
     });
 
     if (!version) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '版本不存在' 
+        message: '版本不存在'
       });
     }
 
@@ -160,9 +166,9 @@ const getVersionContent = async (req, res) => {
     });
   } catch (error) {
     console.error('获取版本内容错误:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -171,7 +177,8 @@ const getVersionContent = async (req, res) => {
 const rollbackVersion = async (req, res) => {
   try {
     const { documentId, versionNumber } = req.params;
-    const { userId } = req.body;
+    const userId = req.user.id;
+    console.log('userId', userId);
 
     // 验证文档是否存在
     const document = await Document.findOne({
@@ -182,17 +189,17 @@ const rollbackVersion = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
     // 检查用户是否有权限编辑
-    if (document.ownerId !== parseInt(userId)) {
-      return res.status(403).json({ 
+    if (parseInt(document.ownerId) !== parseInt(userId)) {
+      return res.status(403).json({
         code: 403,
-        message: '只有文档拥有者才能回退版本' 
+        message: '只有文档拥有者才能回退版本'
       });
     }
 
@@ -206,9 +213,9 @@ const rollbackVersion = async (req, res) => {
     });
 
     if (!targetVersion) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '目标版本不存在' 
+        message: '目标版本不存在'
       });
     }
 
@@ -234,9 +241,9 @@ const rollbackVersion = async (req, res) => {
     });
   } catch (error) {
     console.error('回退版本错误:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
@@ -245,7 +252,7 @@ const rollbackVersion = async (req, res) => {
 const deleteVersion = async (req, res) => {
   try {
     const { documentId, versionNumber } = req.params;
-    const { userId } = req.body;
+    const userId = req.user.id;
 
     // 验证文档是否存在
     const document = await Document.findOne({
@@ -256,17 +263,19 @@ const deleteVersion = async (req, res) => {
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: '文档不存在'
       });
     }
 
     // 只有文档拥有者才能删除版本
-    if (document.ownerId !== parseInt(userId)) {
-      return res.status(403).json({ 
+    console.log(document.ownerId)
+    console.log(userId)
+    if (parseInt(document.ownerId) !== parseInt(userId)) {
+      return res.status(403).json({
         code: 403,
-        message: '只有文档拥有者才能删除版本' 
+        message: '只有文档拥有者才能删除版本'
       });
     }
 
@@ -280,9 +289,9 @@ const deleteVersion = async (req, res) => {
     });
 
     if (!version) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '版本不存在' 
+        message: '版本不存在'
       });
     }
 
@@ -298,9 +307,9 @@ const deleteVersion = async (req, res) => {
     });
   } catch (error) {
     console.error('删除版本错误:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       code: 500,
-      message: '服务器内部错误' 
+      message: '服务器内部错误'
     });
   }
 };
