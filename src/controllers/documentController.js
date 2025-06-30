@@ -52,7 +52,7 @@ const getDocumentContent = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("获取文档内容错误:", error);
+    console.error("获取文档内容错误:", error, error.message, error.stack);
     res.status(500).json({
       code: 500,
       message: "服务器内部错误",
@@ -135,8 +135,6 @@ const deleteDocument = async (req, res) => {
       },
     });
 
-    console.log(document);
-
     if (!document) {
       return res.status(404).json({
         code: 404,
@@ -155,9 +153,6 @@ const deleteDocument = async (req, res) => {
         message: "没有权限删除此文档",
       });
     }
-    console.log(111);
-    console.log(document);
-
     // 软删除文档
     await document.update({ isActive: false });
 
@@ -216,8 +211,6 @@ const createDocument = async (req, res) => {
       if (!doc) {
         return res.status(400).json({ code: 400, message: "父级文档不存在" });
       }
-      console.log("doc", doc);
-
       folderId = doc.folderId;
     } else if (idType === 1) {
       // parentId为文件夹id，直接用
@@ -346,34 +339,11 @@ const editDocumentTitle = async (req, res) => {
 //       order: [["updatedAt", "DESC"]],
 //     });
 
-//     res.json({
-//       code: 200,
-//       message: "获取文档列表成功",
-//       data: documents.map((doc) => ({
-//         id: doc.id,
-//         title: doc.title,
-//         ownerId: doc.ownerId,
-//         ownerName: doc.owner?.username,
-//         knowledgeBaseId: doc.knowledgeBaseId,
-//         folderId: doc.folderId,
-//         createdAt: doc.createdAt,
-//         updatedAt: doc.updatedAt,
-//       })),
-//     });
-//   } catch (error) {
-//     console.error("获取文档列表错误:", error);
-//     res.status(500).json({
-//       code: 500,
-//       message: "服务器内部错误",
-//     });
-//   }
-// };
-
 module.exports = {
   getDocumentContent,
-  saveDocument,
   deleteDocument,
   createDocument,
   editDocumentTitle,
+  saveDocument,
   // getDocumentList,
 };
