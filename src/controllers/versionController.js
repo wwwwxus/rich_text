@@ -1,9 +1,10 @@
 const DocumentVersion = require('../models/DocumentVersion');
 const Document = require('../models/Document');
 const { Op } = require('sequelize');
+const checkKnowledgeBaseAccess = require('./knowledgeBaseController').checkKnowledgeBaseAccess;
 
 // 自动创建版本（内部函数，供文档保存时调用）
-const createVersion = async (documentId, content, userId) => {
+const createVersion = async (documentId, content) => {
   try {
     // 获取最新版本号
     const latestVersion = await DocumentVersion.findOne({
@@ -30,8 +31,7 @@ const createVersion = async (documentId, content, userId) => {
       versionNumber: newVersionNumber,
       content,
       diff,
-      savedAt: new Date(),
-      createdBy: userId
+      savedAt: new Date()
     });
     
     return newVersion;
@@ -189,10 +189,11 @@ const rollbackVersion = async (req, res) => {
     }
 
     // 检查用户是否有权限编辑
-    if (document.ownerId !== parseInt(userId)) {
+    const hasAccess = await checkKnowledgeBaseAccess(userId, document.knowledgeBaseId);
+    if (!hasAccess) { 
       return res.status(403).json({ 
         code: 403,
-        message: '只有文档拥有者才能回退版本' 
+        message: '没有权限回退此文档版本' 
       });
     }
 
@@ -251,22 +252,26 @@ const deleteVersion = async (req, res) => {
     const document = await Document.findOne({
       where: {
         id: documentId,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     if (!document) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '文档不存在' 
+        message: "文档不存在",
       });
     }
 
-    // 只有文档拥有者才能删除版本
-    if (document.ownerId !== parseInt(userId)) {
-      return res.status(403).json({ 
+    // 检查用户是否有权限删除
+    const hasAccess = await checkKnowledgeBaseAccess(
+      userId,
+      document.knowledgeBaseId
+    );
+    if (!hasAccess) {
+      return res.status(403).json({
         code: 403,
-        message: '只有文档拥有者才能删除版本' 
+        message: "没有权限回退此文档删除",
       });
     }
 
@@ -275,14 +280,14 @@ const deleteVersion = async (req, res) => {
       where: {
         documentId,
         versionNumber,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     if (!version) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         code: 404,
-        message: '版本不存在' 
+        message: "版本不存在",
       });
     }
 
@@ -291,10 +296,10 @@ const deleteVersion = async (req, res) => {
 
     res.json({
       code: 200,
-      message: '版本删除成功',
+      message: "版本删除成功",
       data: {
-        deletedVersionNumber: parseInt(versionNumber)
-      }
+        deletedVersionNumber: parseInt(versionNumber),
+      },
     });
   } catch (error) {
     console.error('删除版本错误:', error);
