@@ -294,20 +294,83 @@ const checkKnowledgeBaseAccess = async (userId, knowledgeBaseId) => {
 };
 
 // AI 文档摘要接口
+// const generateSummary = async (req, res) => {
+//   try {
+//     const { documentText } = req.body;
+//     if (!documentText) {
+//       return res.status(200).json({
+//         code: 400,
+//         message: "文档内容不能为空",
+//         data: null,
+//       });
+//     }
+//     const openai = new OpenAI({
+//       apiKey: process.env.VOLC_ENGINE_API_KEY, // 从环境变量获取
+//       baseURL: "https://ark.cn-beijing.volces.com/api/v3",
+//     });
+//     const response = await openai.chat.completions.create({
+//       model: "ep-20250627232809-8d2lz",
+//       messages: [
+//         {
+//           role: "user",
+//           content: `请对以下文档进行摘要，控制在300字内：\n${documentText}`,
+//         },
+//       ],
+//       temperature: 0.4,
+//       max_tokens: 50,
+//     });
+//     const summary = response.choices?.[0]?.message?.content || "";
+//     res.status(200).json({
+//       code: summary ? 200 : 500,
+//       message: summary ? "摘要生成成功" : "AI未返回摘要内容",
+//       data: summary ? { summary } : null,
+//     });
+//   } catch (error) {
+//     console.error("API调用失败：", error);
+//     res.status(200).json({
+//       code: 500,
+//       message: "摘要生成失败",
+//       data: null,
+//     });
+//   }
+// };
+
+// AI 文档摘要接口（流式输出版本）SSE
 const generateSummary = async (req, res) => {
+  let keepAliveInterval;
+
   try {
-    const { documentText } = req.body;
+    // 从GET请求的查询参数获取文档内容
+    const { documentText } = req.query;
+
+    // 立即设置SSE响应头
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+      "X-Accel-Buffering": "no", // 禁用 Nginx 缓冲
+      // 不设置 Content-Length
+    });
+
     if (!documentText) {
-      return res.status(200).json({
-        code: 400,
-        message: "文档内容不能为空",
-        data: null,
-      });
+      res.write("data: 错误：文档内容不能为空\n\n");
+      res.write("event: close\ndata: \n\n");
+      res.end();
+      return;
     }
+
+    // 保持连接活跃的心跳机制
+    keepAliveInterval = setInterval(() => {
+      res.write(": keep-alive\n\n");
+    }, 15000);
+
     const openai = new OpenAI({
-      apiKey: process.env.VOLC_ENGINE_API_KEY, // 从环境变量获取
+      apiKey: process.env.VOLC_ENGINE_API_KEY,
       baseURL: "https://ark.cn-beijing.volces.com/api/v3",
     });
+
     const response = await openai.chat.completions.create({
       model: "ep-20250627232809-8d2lz",
       messages: [
@@ -318,20 +381,48 @@ const generateSummary = async (req, res) => {
       ],
       temperature: 0.4,
       max_tokens: 50,
+      stream: true, // 启用流式输出
     });
-    const summary = response.choices?.[0]?.message?.content || "";
-    res.status(200).json({
-      code: summary ? 200 : 500,
-      message: summary ? "摘要生成成功" : "AI未返回摘要内容",
-      data: summary ? { summary } : null,
-    });
+
+    // 逐块处理流式响应
+    for await (const chunk of response) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        // 发送纯文本内容，不包装JSON
+        console.log(content);
+        res.write(`data: ${content}\n\n`);
+      }
+    }
+
+    // 清除心跳定时器
+    clearInterval(keepAliveInterval);
+
+    // 发送关闭事件
+    res.write("event: close\ndata: \n\n");
+    res.end();
   } catch (error) {
     console.error("API调用失败：", error);
-    res.status(200).json({
-      code: 500,
-      message: "摘要生成失败",
-      data: null,
-    });
+
+    // 清除心跳定时器
+    if (keepAliveInterval) {
+      clearInterval(keepAliveInterval);
+    }
+
+    // 确保响应头已设置
+    if (!res.headersSent) {
+      res.writeHead(500, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control",
+        // 不设置 Content-Length
+      });
+    }
+
+    res.write("data: 摘要生成失败，请稍后重试\n\n");
+    res.write("event: close\ndata: \n\n");
+    res.end();
   }
 };
 

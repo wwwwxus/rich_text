@@ -68,8 +68,8 @@ const setupAssociations = () => {
   Document.belongsTo(Folder, { foreignKey: "folderId" });
 
   // 用户与文档的关系（拥有）
-  User.hasMany(Document, { foreignKey: "ownerId", as: "ownedDocuments" });
-  Document.belongsTo(User, { foreignKey: "ownerId", as: "owner" });
+  // User.hasMany(Document, { foreignKey: "ownerId", as: "ownedDocuments" });
+  // Document.belongsTo(User, { foreignKey: "ownerId", as: "owner" });
 
   // 用户与最近访问的关系
   User.hasMany(RecentAccess, { foreignKey: "userId" });

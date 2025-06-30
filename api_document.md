@@ -118,18 +118,14 @@
 ```json
 {
   "title": "文档标题",
-  "content": "文档内容（可选）",
-  "ownerId": 1,
   "knowledgeBaseId": 1,
   "folderId": 1
 }
 ```
 - **参数说明**:
   - `title` (必填): 文档标题
-  - `content` (可选): 文档内容，默认为空字符串
-  - `ownerId` (必填): 文档拥有者ID
   - `knowledgeBaseId` (必填): 所属知识库ID
-  - `folderId` (可选): 所属文件夹ID，默认为null
+  - `folderId` (可选): 所属文件夹ID，默认为null根文件夹
 - **返回**:
 ```json
 {
@@ -138,8 +134,7 @@
   "data": {
     "id": 1,
     "title": "文档标题",
-    "content": "文档内容",
-    "ownerId": 1,
+    "content": "",
     "knowledgeBaseId": 1,
     "folderId": 1,
     "createdAt": "2024-01-01T00:00:00.000Z",
@@ -150,7 +145,7 @@
 
 ### 3.2 获取文档列表
 - **URL**: `GET /api/documents/list/:knowledgeBaseId`
-- **URL**: `GET /api/documents/list/:knowledgeBaseId/:userId`
+- **URL**: `GET /api/documents/list/:knowledgeBaseId`
 - **描述**: 获取指定知识库的文档列表
 - **参数**:
   - `knowledgeBaseId` (路径参数): 知识库ID
@@ -176,7 +171,7 @@
 ```
 
 ### 3.3 获取文档内容
-- **URL**: `GET /api/documents/:documentId/:userId`
+- **URL**: `GET /api/documents/:documentId`
 - **描述**: 获取指定文档的内容
 - **返回**:
 ```json
@@ -189,7 +184,6 @@
     "content": "文档内容...",
     "knowledgeBaseId": 1,
     "folderId": 1,
-    "ownerId": 1,
     "createdAt": "2024-01-01T00:00:00.000Z",
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
@@ -202,7 +196,6 @@
 - **请求体**:
 ```json
 {
-  "userId": 1,
   "documentId": 1,
   "newContent": "更新后的文档内容",
   "updateTime": "2024-01-01T00:00:00.000Z"
@@ -223,11 +216,10 @@
 ```
 
 ### 3.5 删除文档
-- **URL**: `DELETE /api/documents/:documentId/:userId`
+- **URL**: `DELETE /api/documents/:documentId`
 - **描述**: 删除指定文档（软删除）
 - **参数**:
   - `documentId` (路径参数): 文档ID
-  - `userId` (路径参数): 用户ID（用于权限验证）
 - **返回**:
 ```json
 {
