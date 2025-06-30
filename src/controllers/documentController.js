@@ -279,5 +279,6 @@ module.exports = {
   getDocumentContent,
   deleteDocument,
   createDocument,
+  saveDocument
   // getDocumentList,
 };
