@@ -60,8 +60,8 @@ const deleteComment = async (req, res) => {
 const addTextComment = async (req, res) => {
   try {
     const { textNanoid, comment, documentId } = req.body;
+    console.log(req, req.user);
     const userId = req.user.id; // 从 token 获取
-
     // 验证文档是否存在
     const document = await Document.findOne({
       where: {
