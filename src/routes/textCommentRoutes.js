@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const textCommentController = require('../controllers/textCommentController');
+const auth = require("../middleware/auth");
+
+// 所有路由都需要认证
+router.use(auth);
 
 // 选中文本评论
 // POST /api/text-comments/add
