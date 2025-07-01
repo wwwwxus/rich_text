@@ -30,4 +30,7 @@ router.post("/save", documentController.saveDocument);
 // DELETE /api/documents/:documentId
 router.delete("/:documentId", documentController.deleteDocument);
 
+// 修改文档名称
+router.put("/:documentId", documentController.editDocumentTitle);
+
 module.exports = router;

@@ -24,7 +24,7 @@ const getDocumentContent = async (req, res) => {
     if (!document) {
       return res.status(404).json({
         code: 404,
-        message: '文档不存在'
+        message: "文档不存在",
       });
     }
 
@@ -36,7 +36,7 @@ const getDocumentContent = async (req, res) => {
     if (!hasAccess) {
       return res.status(403).json({
         code: 403,
-        message: '没有权限访问此文档'
+        message: "没有权限访问此文档",
       });
     }
 
@@ -52,10 +52,10 @@ const getDocumentContent = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('获取文档内容错误:', error, error.message, error.stack);
+    console.error("获取文档内容错误:", error, error.message, error.stack);
     res.status(500).json({
       code: 500,
-      message: '服务器内部错误'
+      message: "服务器内部错误",
     });
   }
 };
@@ -77,7 +77,7 @@ const saveDocument = async (req, res) => {
     if (!document) {
       return res.status(404).json({
         code: 404,
-        message: '文档不存在'
+        message: "文档不存在",
       });
     }
 
@@ -135,8 +135,6 @@ const deleteDocument = async (req, res) => {
       },
     });
 
-    console.log(document);
-
     if (!document) {
       return res.status(404).json({
         code: 404,
@@ -155,9 +153,6 @@ const deleteDocument = async (req, res) => {
         message: "没有权限删除此文档",
       });
     }
-    console.log(111);
-    console.log(document);
-
     // 软删除文档
     await document.update({ isActive: false });
 
@@ -185,7 +180,7 @@ const deleteDocument = async (req, res) => {
 // 创建文档
 const createDocument = async (req, res) => {
   try {
-    const { title, knowledgeBaseId, folderId } = req.body;
+    const { title, knowledgeBaseId, parentId, idType } = req.body;
 
     // 验证必填参数
     if (!title || !knowledgeBaseId) {
@@ -204,6 +199,24 @@ const createDocument = async (req, res) => {
         code: 403,
         message: "没有权限创建文档",
       });
+    }
+
+    //判断idType
+    let folderId = null;
+    if (idType === 0) {
+      // parentId为文档id，找该文档的父级文件夹
+      const doc = await Document.findOne({
+        where: { id: parentId, isActive: true },
+      });
+      if (!doc) {
+        return res.status(400).json({ code: 400, message: "父级文档不存在" });
+      }
+      folderId = doc.folderId;
+    } else if (idType === 1) {
+      // parentId为文件夹id，直接用
+      folderId = parentId;
+    } else {
+      return res.status(400).json({ code: 400, message: "无效的idType参数" });
     }
 
     // 创建文档
@@ -247,6 +260,57 @@ const createDocument = async (req, res) => {
   }
 };
 
+// 编辑文档名称
+const editDocumentTitle = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { documentId } = req.params;
+    const { title } = req.body;
+    if (!title) {
+      return res.status(400).json({
+        code: 400,
+        message: "文档名称不能为空",
+      });
+    }
+    const document = await Document.findOne({
+      where: { id: documentId, isActive: true },
+    });
+    if (!document) {
+      return res.status(404).json({
+        code: 404,
+        message: "文档不存在",
+      });
+    }
+    // 权限校验
+    const hasAccess = await checkKnowledgeBaseAccess(
+      userId,
+      document.knowledgeBaseId
+    );
+    if (!hasAccess) {
+      return res.status(403).json({
+        code: 403,
+        message: "没有权限编辑文档名称",
+      });
+    }
+    await document.update({ title });
+    res.json({
+      code: 200,
+      message: "文档名称更新成功",
+      data: {
+        id: document.id,
+        title: document.title,
+        updatedAt: document.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("编辑文档名称错误:", error);
+    res.status(500).json({
+      code: 500,
+      message: "服务器内部错误",
+    });
+  }
+};
+
 // 获取文档列表
 // const getDocumentList = async (req, res) => {
 //   try {
@@ -279,6 +343,7 @@ module.exports = {
   getDocumentContent,
   deleteDocument,
   createDocument,
-  saveDocument
+  editDocumentTitle,
+  saveDocument,
   // getDocumentList,
 };

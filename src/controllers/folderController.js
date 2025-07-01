@@ -63,7 +63,7 @@ const getFolderContent = async (req, res) => {
           id: subFolder.id,
           name: subFolder.name,
         })),
-        documents: documents.map((doc) => ({ id: doc.id, name: doc.title })),
+        documents: documents.map((doc) => ({ id: doc.id, title: doc.title })),
       },
     });
   } catch (error) {
@@ -79,7 +79,7 @@ const getFolderContent = async (req, res) => {
 // 创建文件夹
 const createFolder = async (req, res) => {
   try {
-    const { knowledgeBaseId, name, parentFolderId } = req.body; // 新增 parentFolderId
+    const { knowledgeBaseId, name, parentId, idType } = req.body; // 新增 parentId
     const userId = req.user.id;
 
     if (!name || !knowledgeBaseId) {
@@ -99,6 +99,31 @@ const createFolder = async (req, res) => {
         data: null,
       });
     }
+
+    // 处理idType和parentId逻辑
+    let parentFolderId = null;
+    if (idType === 0) {
+      console.log(222);
+
+      // parentId为文档id，找该文档的父级文件夹
+      const parentDoc = await Document.findOne({
+        where: { id: parentId, isActive: true },
+      });
+      if (!parentDoc) {
+        return res.status(200).json({
+          code: 400,
+          message: "父级文档不存在",
+          data: null,
+        });
+      }
+      parentFolderId = parentDoc.folderId;
+    } else if (idType === 1) {
+      // parentId为文件夹id，直接用
+      parentFolderId = parentId;
+    } else {
+      parentFolderId = null;
+    }
+    console.log(parentFolderId);
 
     // 如果有 parentFolderId，检查父文件夹是否存在且属于同一知识库
     if (parentFolderId) {
