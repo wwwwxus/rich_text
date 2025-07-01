@@ -319,138 +319,98 @@ const deleteVersion = async (req, res) => {
 };
 
 
-function addMark(node, markType) {
-  if (node.marks) {
-    if (!node.marks.some(m => m.type === markType)) {
-      node.marks.push({ type: markType });
-    }
-  } else {
-    node.marks = [{ type: markType }];
-  }
-
-  if (node.content) {
-    node.content.forEach(child => addMark(child, markType));
-  }
-}
-
-function createCharMap(tiptapJson) {
-  const charMap = [];
-  let plainText = '';
-
-  function traverse(nodes) {
-    if (!nodes || !Array.isArray(nodes)) return;
-    nodes.forEach(node => {
-      if (node.type === 'text') {
-        const text = node.text || '';
-        for (const char of text) {
-          charMap.push({ char, marks: node.marks || [] });
-          plainText += char;
-        }
-      } else if (node.content) {
-        traverse(node.content);
-      }
-    });
-  }
-
-  traverse(tiptapJson.content);
-  return { charMap, plainText };
-}
-
-function mergeTextNodes(nodes) {
-  if (!nodes || nodes.length === 0) return [];
-  const merged = [JSON.parse(JSON.stringify(nodes[0]))];
-
-  for (let i = 1; i < nodes.length; i++) {
-    const current = nodes[i];
-    const last = merged[merged.length - 1];
-
-    const lastMarks = JSON.stringify(last.marks || []);
-    const currentMarks = JSON.stringify(current.marks || []);
-
-    if (last.type === 'text' && current.type === 'text' && lastMarks === currentMarks) {
-      last.text += current.text;
-    } else {
-      merged.push(JSON.parse(JSON.stringify(current)));
-    }
-  }
-  return merged;
-}
 
 const compareVersions = async (req, res) => {
   try {
-    const { documentId, versionNumber1, versionNumber2 } = req.params;
+    const { documentId, versionNumber1, versionNumber2 } = req.params 
 
     const version1 = await DocumentVersion.findOne({
       where: { documentId, versionNumber: versionNumber1, isActive: true }
-    });
+    }) 
 
     const version2 = await DocumentVersion.findOne({
       where: { documentId, versionNumber: versionNumber2, isActive: true }
-    });
+    }) 
 
     if (!version1 || !version2) {
-      return res.status(404).json({ code: 404, message: '一个或两个版本不存在' });
+      return res.status(404).json({ code: 404, message: '一个或两个版本不存在' }) 
     }
 
-    let json1, json2;
+    let json1, json2 
     try {
-      json1 = JSON.parse(version1.content);
+      json1 = JSON.parse(version1.content) 
     } catch (e) {
-      json1 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version1.content }] }] };
+      json1 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version1.content }] }] } 
     }
     try {
-      json2 = JSON.parse(version2.content);
+      json2 = JSON.parse(version2.content) 
     } catch (e) {
-      json2 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version2.content }] }] };
+      json2 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version2.content }] }] } 
     }
 
-    const { charMap: charMap1, plainText: plainText1 } = createCharMap(json1);
-    const { plainText: plainText2 } = createCharMap(json2);
-
-    const diff = JsDiff.diffChars(plainText1, plainText2);
-    const newTextNodes = [];
-    let charMapIndex = 0;
-
-    diff.forEach(part => {
-      if (part.added) {
-        newTextNodes.push({ type: 'text', text: part.value, marks: [{ type: 'add' }] });
-      } else if (part.removed) {
-        for (let i = 0; i < part.value.length; i++) {
-          const charInfo = charMap1[charMapIndex++];
-          const marks = [...charInfo.marks, { type: 'remove' }];
-          newTextNodes.push({ type: 'text', text: charInfo.char, marks });
-        }
-      } else { // common
-        for (let i = 0; i < part.value.length; i++) {
-          const charInfo = charMap1[charMapIndex++];
-          newTextNodes.push({ type: 'text', text: charInfo.char, marks: charInfo.marks });
-        }
-      }
-    });
-
-    const mergedContent = mergeTextNodes(newTextNodes);
-
-    const tiptapResult = {
-      type: 'doc',
-      content: [{
-        type: 'paragraph',
-        content: mergedContent
-      }]
-    };
+    // 递归对比，保留所有结构
+    const diffResult = diffNodes(json1, json2) 
 
     res.json({
       code: 200,
       message: '高保真富文本对比成功',
       data: {
-        tiptap: JSON.stringify(tiptapResult)
+        tiptap: JSON.stringify(diffResult)
       }
-    });
+    }) 
   } catch (error) {
-    console.error('版本对比错误:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误' });
+    console.error('版本对比错误:', error) 
+    res.status(500).json({ code: 500, message: '服务器内部错误' }) 
   }
-};
+} 
 
+function diffNodes(node1, node2) {
+  if (!node1 && !node2) return null 
+  if (!node1) return { ...node2, marks: [...(node2.marks || []), { type: 'add' }] } 
+  if (!node2) return { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] } 
+
+  if (node1.type !== node2.type) {
+    // 类型不同，全部标记为删除和新增
+    return [
+      { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] },
+      { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
+    ] 
+  }
+
+  if (node1.type === 'text' && node2.type === 'text') {
+    // 对比文本内容
+    const diff = JsDiff.diffChars(node1.text || '', node2.text || '') 
+    const result = [] 
+    diff.forEach(part => {
+      if (part.added) {
+        result.push({ type: 'text', text: part.value, marks: [...(node2.marks || []), { type: 'add' }] }) 
+      } else if (part.removed) {
+        result.push({ type: 'text', text: part.value, marks: [...(node1.marks || []), { type: 'remove' }] }) 
+      } else {
+        result.push({ type: 'text', text: part.value, marks: node1.marks || [] }) 
+      }
+    }) 
+    return result 
+  }
+
+  // 递归对比子节点
+  if (node1.content && node2.content) {
+    const length = Math.max(node1.content.length, node2.content.length) 
+    const newContent = []
+    for (let i = 0; i < length; i++) {
+      const diffed = diffNodes(node1.content[i], node2.content[i])
+      if (Array.isArray(diffed)) {
+        newContent.push(...diffed)
+      } else if (diffed) {
+        newContent.push(diffed) 
+      }
+    }
+    return { ...node1, content: newContent }
+  }
+
+  // 只保留结构
+  return node1
+}
 
 module.exports = {
   createVersion,
@@ -459,4 +419,4 @@ module.exports = {
   rollbackVersion,
   deleteVersion,
   compareVersions
-}; 
+} 
