@@ -12,11 +12,6 @@ const TextComment = sequelize.define('TextComment', {
     allowNull: false,
     comment: '所选文本的唯一标识'
   },
-  textContent: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    comment: '被选中的文本内容'
-  },
   comment: {
     type: DataTypes.TEXT,
     allowNull: false,

@@ -19,7 +19,7 @@ const DocumentVersion = sequelize.define('DocumentVersion', {
     comment: '版本号'
   },
   content: {
-    type: DataTypes.TEXT,
+    type: DataTypes.LONGTEXT,
     allowNull: false,
     comment: '该版本的内容'
   },
