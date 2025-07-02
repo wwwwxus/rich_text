@@ -530,6 +530,83 @@ const checkKnowledgeBaseAuth = async (req, res) => {
   }
 };
 
+// 获取知识库中所有文档ID（包括文件夹内的文档）
+const getAllDocumentIds = async (req, res) => {
+  try {
+    const { knowledgeBaseId } = req.params;
+    const userId = req.user.id;
+
+    // 检查用户是否有权限访问该知识库
+    const hasAccess = await checkKnowledgeBaseAccess(userId, knowledgeBaseId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        code: 403,
+        message: "没有权限访问该知识库",
+        data: null,
+      });
+    }
+
+    // 递归获取所有文档ID的辅助函数
+    const getDocumentIdsRecursively = async (folderId = null) => {
+      const documentIds = [];
+
+      // 获取当前层级的文档
+      const documents = await Document.findAll({
+        where: {
+          knowledgeBaseId,
+          folderId: folderId,
+          isActive: true,
+        },
+        attributes: ["id"],
+      });
+
+      // 添加当前层级的文档ID
+      documentIds.push(...documents.map((doc) => doc.id));
+
+      // 获取当前层级的文件夹
+      const folders = await Folder.findAll({
+        where: {
+          knowledgeBaseId: knowledgeBaseId,
+          parentFolderId: folderId,
+          isActive: true,
+        },
+        attributes: ["id"],
+      });
+
+      // 递归获取每个文件夹内的文档ID
+      for (const folder of folders) {
+        const subDocumentIds = await getDocumentIdsRecursively(folder.id);
+        documentIds.push(...subDocumentIds);
+      }
+
+      return documentIds;
+    };
+
+    // 获取所有文档ID
+    const allDocumentIds = await getDocumentIdsRecursively();
+
+    // 更新最近访问记录
+    await updateRecentAccess(userId, knowledgeBaseId);
+
+    res.json({
+      code: 200,
+      message: "操作成功",
+      data: {
+        knowledgeBaseId: knowledgeBaseId,
+        documentIds: allDocumentIds,
+        totalCount: allDocumentIds.length,
+      },
+    });
+  } catch (error) {
+    console.error("获取知识库所有文档ID失败:", error);
+    res.status(200).json({
+      code: 500,
+      message: "获取知识库所有文档ID失败",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   getAccessibleKnowledgeBases,
   getKnowledgeBaseContent,
@@ -539,5 +616,6 @@ module.exports = {
   inviteCollaboration,
   getRecentKnowledgeBases,
   checkKnowledgeBaseAuth,
-  checkKnowledgeBaseAccess
+  checkKnowledgeBaseAccess,
+  getAllDocumentIds,
 };

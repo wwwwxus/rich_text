@@ -24,6 +24,12 @@ router.get(
   knowledgeBaseController.getKnowledgeBaseContent
 );
 
+// 获取知识库中所有文档ID（包括文件夹内的文档）
+router.get(
+  "/:knowledgeBaseId/documents/ids",
+  knowledgeBaseController.getAllDocumentIds
+);
+
 // 创建知识库
 router.post("/", knowledgeBaseController.createKnowledgeBase);
 
