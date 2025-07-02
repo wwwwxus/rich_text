@@ -366,7 +366,20 @@ const generateSummary = async (req, res) => {
 
   try {
     // 从GET请求的查询参数获取文档内容
-    const { documentText } = req.query;
+    // !!!无法获取很长的文段 改成post
+    // const {documentText}= reg.query;
+
+    // 从POST请求的请求体获取文档内容
+    const { documentText } = req.body;
+
+    // 调试信息
+    console.log("收到的请求体:", req.body);
+    console.log("documentText:", documentText);
+    console.log("documentText类型:", typeof documentText);
+    console.log(
+      "documentText长度:",
+      documentText ? documentText.length : "undefined"
+    );
 
     // 立即设置SSE响应头
     res.writeHead(200, {
