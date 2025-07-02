@@ -6,7 +6,6 @@ const Document = require("../models/Document");
 const deleteComment = async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { textNanoid } = req.body; // 需要前端传递 textNanoid
     const userId = req.user.id; // 从 token 获取
 
     const comment = await TextComment.findOne({
@@ -34,18 +33,9 @@ const deleteComment = async (req, res) => {
     // 软删除评论
     await comment.update({ isActive: false });
 
-    // 查询剩余评论条数
-    const remainCount = await TextComment.count({
-      where: {
-        textNanoid: textNanoid || comment.textNanoid,
-        isActive: true
-      }
-    });
-
     res.json({
       code: 200,
       message: '评论删除成功',
-      remainCount // 剩余评论条数
     });
   } catch (error) {
     console.error("删除评论错误:", error);
