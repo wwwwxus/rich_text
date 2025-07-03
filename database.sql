@@ -60,7 +60,6 @@ CREATE TABLE `documents` (
   `id` int NOT NULL AUTO_INCREMENT,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `content` longtext COLLATE utf8mb4_unicode_ci,
-  `ownerId` int NOT NULL DEFAULT '1' COMMENT '用户id',
   `knowledgeBaseId` int NOT NULL,
   `folderId` int DEFAULT NULL,
   `isActive` tinyint(1) DEFAULT '1',
@@ -69,10 +68,8 @@ CREATE TABLE `documents` (
   PRIMARY KEY (`id`),
   KEY `fk_documents_kb_idx` (`knowledgeBaseId`),
   KEY `fk_documents_folder_idx` (`folderId`),
-  KEY `fk_documents_owner` (`ownerId`),
   CONSTRAINT `fk_documents_folder` FOREIGN KEY (`folderId`) REFERENCES `folders` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_documents_kb` FOREIGN KEY (`knowledgeBaseId`) REFERENCES `knowledgebases` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_documents_owner` FOREIGN KEY (`ownerId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_documents_kb` FOREIGN KEY (`knowledgeBaseId`) REFERENCES `knowledgebases` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -82,7 +79,7 @@ CREATE TABLE `documents` (
 
 LOCK TABLES `documents` WRITE;
 /*!40000 ALTER TABLE `documents` DISABLE KEYS */;
-INSERT INTO `documents` VALUES (5,'测试文档','这是第二个版本的内容，内容增加了 - 2025/6/28 19:18:03',21,21,2,0,'2025-06-28 19:16:54','2025-06-28 20:02:36'),(7,'hihi','哈哈哈哈哈哈',21,21,NULL,0,'2025-06-28 19:58:08','2025-06-28 20:01:51'),(8,'hihi','',21,21,NULL,1,'2025-06-28 20:04:23','2025-06-28 20:04:23'),(9,'hihi','xixixixixii',22,21,NULL,1,'2025-06-28 20:08:38','2025-06-28 20:32:36');
+INSERT INTO `documents` VALUES (5,'测试文档','这是第二个版本的内容，内容增加了 - 2025/6/28 19:18:03',21,2,0,'2025-06-28 19:16:54','2025-06-28 20:02:36'),(7,'hihi','哈哈哈哈哈哈',21,NULL,0,'2025-06-28 19:58:08','2025-06-28 20:01:51'),(8,'hihi','',21,NULL,1,'2025-06-28 20:04:23','2025-06-28 20:04:23'),(9,'hihi','xixixixixii',22,NULL,1,'2025-06-28 20:08:38','2025-06-28 20:32:36');
 /*!40000 ALTER TABLE `documents` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -230,6 +227,7 @@ CREATE TABLE `textcomments` (
   `comment` text NOT NULL COMMENT '评论内容',
   `userId` int NOT NULL COMMENT '评论用户ID',
   `documentId` int NOT NULL COMMENT '文档ID',
+  `parentId` int DEFAULT NULL COMMENT '父评论ID，支持嵌套回复',
   `isActive` tinyint(1) DEFAULT '1' COMMENT '是否有效',
   `createdAt` datetime NOT NULL,
   `updatedAt` datetime NOT NULL,
@@ -237,8 +235,10 @@ CREATE TABLE `textcomments` (
   KEY `text_comments_text_nanoid` (`textNanoid`),
   KEY `text_comments_document_id` (`documentId`),
   KEY `text_comments_user_id` (`userId`),
+  KEY `text_comments_parent_id` (`parentId`),
   CONSTRAINT `textcomments_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `textcomments_ibfk_2` FOREIGN KEY (`documentId`) REFERENCES `documents` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `textcomments_ibfk_2` FOREIGN KEY (`documentId`) REFERENCES `documents` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `textcomments_ibfk_3` FOREIGN KEY (`parentId`) REFERENCES `textcomments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -248,7 +248,7 @@ CREATE TABLE `textcomments` (
 
 LOCK TABLES `textcomments` WRITE;
 /*!40000 ALTER TABLE `textcomments` DISABLE KEYS */;
-INSERT INTO `textcomments` VALUES (6,'98','你好','哈哈哈哈哈',21,8,1,'2025-06-28 20:04:48','2025-06-28 20:04:48'),(7,'98','你好','xixixixixiixx',21,8,1,'2025-06-28 20:06:31','2025-06-28 20:06:31'),(8,'98','xixi','xixixixixiixx',22,9,0,'2025-06-28 20:09:05','2025-06-28 20:11:23');
+INSERT INTO `textcomments` VALUES (6,'98','你好','哈哈哈哈哈',21,8,NULL,1,'2025-06-28 20:04:48','2025-06-28 20:04:48'),(7,'98','你好','xixixixixiixx',21,8,NULL,1,'2025-06-28 20:06:31','2025-06-28 20:06:31'),(8,'98','xixi','xixixixixiixx',22,9,NULL,0,'2025-06-28 20:09:05','2025-06-28 20:11:23');
 /*!40000 ALTER TABLE `textcomments` ENABLE KEYS */;
 UNLOCK TABLES;
 

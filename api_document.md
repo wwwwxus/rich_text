@@ -268,38 +268,41 @@
   - `documentId` (路径参数): 文档 ID
 - **请求体**:
 
-````json
+```json
 {
   "title":"文档名称"
 }
+```
+
 - **返回**:
+
 ```json
 {
   "code": 200,
   "message": "文档名称更新成功",
   "data": {
-        "id": "id",
-        "title": "标题",
-        "updatedAt": "2025-06-10",
-    },
+    "id": "id",
+    "title": "标题",
+    "updatedAt": "2025-06-10",
+  },
 }
-````
+```
 
 ## 4. 文本评论接口
 
-### 4.1 选中文本评论
+### 4.1 选中文本评论/回复
 
 - **URL**: `POST /api/text-comments/add`
-- **描述**: 为选中的文本添加评论
+- **描述**: 为选中的文本添加评论或回复
+- **权限**: 仅知识库协作者或拥有者可评论/回复
 - **请求体**:
 
 ```json
 {
   "textNanoid": "unique_text_id",
-  "textContent": "被选中的文本内容",
   "comment": "评论内容",
-  "userId": 1,
-  "documentId": 1
+  "documentId": 1,
+  "parentId": 2 // 可选，回复时填写父评论ID，顶级评论为null或不传
 }
 ```
 
@@ -312,65 +315,19 @@
   "data": {
     "id": 1,
     "textNanoid": "unique_text_id",
-    "textContent": "被选中的文本内容",
     "comment": "评论内容",
     "userId": 1,
     "documentId": 1,
+    "parentId": null,
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-#### textNanoid 参数说明
-
-`textNanoid` 是前端在用户选中文本时动态生成的唯一标识符，用于标识特定的文本片段。
-
-**生成规则**:
-
-- 格式: `text_{随机字符串}_{时间戳}`
-- 示例: `text_ABC123DEF_1704067200000`
-- 长度: 通常 20-30 个字符
-
-**前端实现步骤**:
-
-1. 监听文本选中事件 (`mouseup` 或 `selectionchange`)
-2. 获取选中的文本内容
-3. 生成唯一的 `textNanoid`
-4. 显示评论按钮或对话框
-5. 用户输入评论后，将 `textNanoid` 和评论内容一起发送到 API
-
-**生成示例代码**:
-
-```javascript
-// 使用 nanoid 库
-import { nanoid } from "nanoid";
-const textNanoid = `text_${nanoid(10)}_${Date.now()}`;
-
-// 或使用自定义函数
-function generateTextNanoid() {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "text_";
-  for (let i = 0; i < 10; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  result += "_" + Date.now();
-  return result;
-}
-```
-
-**使用场景**:
-
-- 用户选中文档中的一段文本
-- 前端生成唯一的 `textNanoid`
-- 用户点击评论按钮，输入评论内容
-- 前端将 `textNanoid`、选中的文本内容、评论内容一起发送到后端
-- 后端保存评论，可以通过 `textNanoid` 关联到具体的文本片段
-
-### 4.2 获取文本评论
+### 4.2 获取文本评论（嵌套结构）
 
 - **URL**: `GET /api/text-comments/:textNanoid`
-- **描述**: 获取指定文本片段的所有评论
+- **描述**: 获取指定文本片段的所有评论及回复，返回树状嵌套结构
 - **参数**:
   - `textNanoid` (路径参数): 文本的唯一标识
 - **返回**:
@@ -382,20 +339,33 @@ function generateTextNanoid() {
   "data": [
     {
       "id": 1,
-      "textContent": "被选中的文本内容",
-      "comment": "评论内容",
+      "comment": "父评论内容",
       "userId": 1,
       "username": "用户名",
-      "createdAt": "2024-01-01T00:00:00.000Z"
+      "parentId": null,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "children": [
+        {
+          "id": 2,
+          "comment": "回复内容",
+          "userId": 2,
+          "username": "协作者",
+          "parentId": 1,
+          "createdAt": "2024-01-01T00:00:00.000Z",
+          "children": []
+        }
+      ]
     }
   ]
 }
 ```
 
-### 4.3 获取文档的所有文本评论
+> 每条评论包含 children 字段，递归嵌套所有回复。
+
+### 4.3 获取文档的所有文本评论（嵌套结构）
 
 - **URL**: `GET /api/text-comments/document/:documentId`
-- **描述**: 获取指定文档的所有文本评论
+- **描述**: 获取指定文档的所有文本评论及回复，返回树状嵌套结构
 - **参数**:
   - `documentId` (路径参数): 文档 ID
 - **返回**:
@@ -408,15 +378,29 @@ function generateTextNanoid() {
     {
       "id": 1,
       "textNanoid": "unique_text_id",
-      "textContent": "被选中的文本内容",
-      "comment": "评论内容",
+      "comment": "父评论内容",
       "userId": 1,
       "username": "用户名",
-      "createdAt": "2024-01-01T00:00:00.000Z"
+      "parentId": null,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "children": [
+        {
+          "id": 2,
+          "textNanoid": "unique_text_id",
+          "comment": "回复内容",
+          "userId": 2,
+          "username": "协作者",
+          "parentId": 1,
+          "createdAt": "2024-01-01T00:00:00.000Z",
+          "children": []
+        }
+      ]
     }
   ]
 }
 ```
+
+> 每条评论包含 children 字段，递归嵌套所有回复。
 
 ### 4.4 删除文本评论
 
