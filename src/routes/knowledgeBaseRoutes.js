@@ -42,4 +42,10 @@ router.put("/:id", knowledgeBaseController.updateKnowledgeBase);
 // 邀请协作
 router.post("/invite", knowledgeBaseController.inviteCollaboration);
 
+//搜索文档文件夹
+router.get(
+  "/search/:knowledgeBaseId/:searchQuery",
+  knowledgeBaseController.searchKnowledgeBaseContent
+);
+
 module.exports = router;
