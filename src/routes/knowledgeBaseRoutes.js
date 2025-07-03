@@ -48,4 +48,16 @@ router.get(
   knowledgeBaseController.searchKnowledgeBaseContent
 );
 
+// 获取知识库所有用户权限信息
+router.get(
+  "/:knowledgeBaseId/permissions",
+  knowledgeBaseController.getKnowledgeBasePermissions
+);
+
+// 删除知识库权限用户
+router.delete(
+  "/permissions/:knowledgeBaseId/:userId",
+  knowledgeBaseController.removeKnowledgeBaseCollaborator
+);
+
 module.exports = router;

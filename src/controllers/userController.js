@@ -165,7 +165,7 @@ const searchUserByEmail = async (req, res) => {
           [Op.notIn]: [ownerId, ...collaboratorIds, req.user.id], // 排除owner、协作者、自己
         },
       },
-      attributes: ["id", "username"],
+      attributes: ["id", "username", "email"],
       limit: 3,
     });
 
