@@ -378,38 +378,56 @@ function diffNodes(node1, node2) {
   }
 
   if (node1.type === 'text' && node2.type === 'text') {
-    // 对比文本内容
-    const diff = JsDiff.diffChars(node1.text || '', node2.text || '') 
-    const result = [] 
+    const textEqual = (node1.text || '') === (node2.text || '');
+    const marksEqual = JSON.stringify(node1.marks || []) === JSON.stringify(node2.marks || []);
+    if (textEqual && !marksEqual) {
+      // 样式不同，全部标记为删除和新增
+      return [
+        { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] },
+        { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
+      ];
+    }
+    // 内容不同，按字符 diff
+    const diff = JsDiff.diffChars(node1.text || '', node2.text || '');
+    const result = [];
     diff.forEach(part => {
       if (part.added) {
-        result.push({ type: 'text', text: part.value, marks: [...(node2.marks || []), { type: 'add' }] }) 
+        result.push({ type: 'text', text: part.value, marks: [...(node2.marks || []), { type: 'add' }] });
       } else if (part.removed) {
-        result.push({ type: 'text', text: part.value, marks: [...(node1.marks || []), { type: 'remove' }] }) 
+        result.push({ type: 'text', text: part.value, marks: [...(node1.marks || []), { type: 'remove' }] });
       } else {
-        result.push({ type: 'text', text: part.value, marks: node1.marks || [] }) 
+        result.push({ type: 'text', text: part.value, marks: node1.marks || [] });
       }
-    }) 
-    return result 
+    });
+    return result;
   }
 
   // 递归对比子节点
   if (node1.content && node2.content) {
-    const length = Math.max(node1.content.length, node2.content.length) 
-    const newContent = []
+    const length = Math.max(node1.content.length, node2.content.length);
+    const newContent = [];
     for (let i = 0; i < length; i++) {
-      const diffed = diffNodes(node1.content[i], node2.content[i])
+      const diffed = diffNodes(node1.content[i], node2.content[i]);
       if (Array.isArray(diffed)) {
-        newContent.push(...diffed)
+        newContent.push(...diffed);
       } else if (diffed) {
-        newContent.push(diffed) 
+        newContent.push(diffed);
       }
     }
-    return { ...node1, content: newContent }
+    return { ...node1, content: newContent };
   }
+}
 
-  // 只保留结构
-  return node1
+// 递归给所有文本节点加 mark
+function markAllTextNodes(node, mark) {
+  if (!node) return node;
+  if (node.type === 'text') {
+    return { ...node, marks: [...(node.marks || []), mark] };
+  }
+  if (Array.isArray(node.content)) {
+    return { ...node, content: node.content.map(child => markAllTextNodes(child, mark)) };
+  }
+  return node;
 }
 
 module.exports = {
@@ -419,4 +437,4 @@ module.exports = {
   rollbackVersion,
   deleteVersion,
   compareVersions
-} 
+}
