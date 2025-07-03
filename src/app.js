@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const http = require("http");
 const sequelize = require("./config/database");
 const userRoutes = require("./routes/userRoutes");
 const knowledgeBaseRoutes = require("./routes/knowledgeBaseRoutes");
@@ -7,6 +8,7 @@ const folderRoutes = require("./routes/folderRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const textCommentRoutes = require("./routes/textCommentRoutes");
 const versionRoutes = require("./routes/versionRoutes");
+const { createWebSocketServer } = require("./webSocketServer");
 require("dotenv").config();
 
 // 导入模型
@@ -99,6 +101,9 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/text-comments", textCommentRoutes);
 app.use("/api/versions", versionRoutes);
 
+// 创建HTTP服务器
+const server = http.createServer(app);
+
 // 数据库连接和服务器启动
 const PORT = process.env.PORT || 3000;
 
@@ -114,8 +119,31 @@ const start = async () => {
     await sequelize.sync();
     console.log("Database synchronized.");
 
-    app.listen(PORT, () => {
+    // 启动WebSocket服务器
+    const { wss, cleanup } = createWebSocketServer(server);
+
+    // 启动HTTP服务器
+    server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+    });
+
+    // 处理进程退出事件
+    process.on("SIGINT", () => {
+      console.log("正在关闭服务器...");
+      cleanup();
+      server.close(() => {
+        console.log("HTTP服务器已关闭");
+        process.exit(0);
+      });
+    });
+
+    process.on("SIGTERM", () => {
+      console.log("正在关闭服务器...");
+      cleanup();
+      server.close(() => {
+        console.log("HTTP服务器已关闭");
+        process.exit(0);
+      });
     });
   } catch (error) {
     console.error("Unable to connect to the database:", error);

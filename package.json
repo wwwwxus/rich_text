@@ -18,7 +18,10 @@
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.6.1",
     "openai": "^5.8.2",
-    "sequelize": "^6.33.0"
+    "sequelize": "^6.33.0",
+    "ws": "^8.18.3",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
