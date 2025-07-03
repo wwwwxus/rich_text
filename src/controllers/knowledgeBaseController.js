@@ -261,6 +261,95 @@ const updateKnowledgeBase = async (req, res) => {
   }
 };
 
+// 搜索知识库中的文档或文件夹，只要子文件夹或者文档命中这个searchQuery即可被找到，get方法 params:searchQuery,knowledgeBaseId
+const searchKnowledgeBaseContent = async (req, res) => {
+  try {
+    const { searchQuery, knowledgeBaseId } = req.params;
+    const userId = req.user.id;
+    if (!searchQuery || !knowledgeBaseId) {
+      return res
+        .status(400)
+        .json({ code: 400, message: "参数缺失", data: null });
+    }
+    // 权限校验
+    const hasAccess = await checkKnowledgeBaseAccess(userId, knowledgeBaseId);
+    if (!hasAccess) {
+      return res
+        .status(403)
+        .json({ code: 403, message: "没有权限", data: null });
+    }
+    // 只返回根目录的文件夹，根目录文件夹自己命中或其子孙命中关键词则返回该根文件夹
+    async function searchRootFolders() {
+      // 查找根目录下的文件夹
+      const rootFolders = await Folder.findAll({
+        where: { knowledgeBaseId, parentFolderId: null, isActive: true },
+        attributes: ["id", "name"],
+      });
+      const resultFolders = [];
+      for (const folder of rootFolders) {
+        // 1. 先判断根目录文件夹自己是否命中
+        const folderMatch = folder.name
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+        if (folderMatch) {
+          resultFolders.push({ id: folder.id, name: folder.name });
+          continue;
+        }
+        // 2. 递归判断子孙文件夹或文档是否命中
+        const hasDescendantMatch = await checkDescendantMatch(folder.id);
+        if (hasDescendantMatch) {
+          resultFolders.push({ id: folder.id, name: folder.name });
+        }
+      }
+      return resultFolders;
+    }
+    // 递归判断子孙文件夹或文档是否命中
+    async function checkDescendantMatch(folderId) {
+      // 子文件夹
+      const folders = await Folder.findAll({
+        where: { knowledgeBaseId, parentFolderId: folderId, isActive: true },
+        attributes: ["id", "name"],
+      });
+      for (const folder of folders) {
+        if (folder.name.toLowerCase().includes(searchQuery.toLowerCase()))
+          return true;
+        if (await checkDescendantMatch(folder.id)) return true;
+      }
+      // 子文档
+      const documents = await Document.findAll({
+        where: { knowledgeBaseId, folderId: folderId, isActive: true },
+        attributes: ["id", "title"],
+      });
+      for (const doc of documents) {
+        if (doc.title.toLowerCase().includes(searchQuery.toLowerCase()))
+          return true;
+      }
+      return false;
+    }
+    // 根目录下的文档
+    const rootDocuments = await Document.findAll({
+      where: { knowledgeBaseId, folderId: null, isActive: true },
+      attributes: ["id", "title"],
+    });
+    // 只返回命中的根文档
+    const resultDocuments = rootDocuments.filter((doc) =>
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    // 汇总结果
+    const folders = await searchRootFolders();
+    res.json({
+      code: 200,
+      message: "操作成功",
+      data: { folders, documents: resultDocuments },
+    });
+  } catch (error) {
+    console.error("搜索知识库内容失败:", error);
+    res
+      .status(500)
+      .json({ code: 500, message: "搜索知识库内容失败", data: null });
+  }
+};
+
 // 邀请协作
 // const inviteCollaboration = async (req, res) => {
 //   try {
@@ -618,4 +707,5 @@ module.exports = {
   checkKnowledgeBaseAuth,
   checkKnowledgeBaseAccess,
   getAllDocumentIds,
+  searchKnowledgeBaseContent,
 };
