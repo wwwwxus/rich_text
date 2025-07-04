@@ -12,7 +12,7 @@ const Document = sequelize.define('Document', {
     allowNull: false
   },
   content: {
-    type: DataTypes.TEXT,
+    type: DataTypes.TEXT('long'),
     allowNull: true
   },
   knowledgeBaseId: {
