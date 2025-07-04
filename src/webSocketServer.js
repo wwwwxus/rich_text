@@ -44,7 +44,13 @@ function createWebSocketServer(server) {
 
     // 解析房间名称
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const roomname = url.searchParams.get("room") || "collaborative-document";
+    // const roomname = url.searchParams.get("room") || "collaborative-document";
+    // if (!roomname) {
+    // 如果没有 ?room=xxx，则用路径作为房间名
+    // 去掉开头的斜杠
+    roomname = url.pathname.replace(/^\//, "") || "collaborative-document";
+    console.log(roomname);
+    // }
 
     // 获取或创建文档和awareness
     const doc = getYDoc(roomname);
@@ -205,7 +211,11 @@ function createWebSocketServer(server) {
       ws.ping();
     });
 
-    console.log(`当前WebSocket连接数: ${clients.size}`);
+    console.log(
+      `当前WebSocket连接数: ${clients.size}`,
+      clients.keys(),
+      clients.values()
+    );
   }, 30000);
 
   wss.on("error", (error) => {

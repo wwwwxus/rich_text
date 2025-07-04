@@ -31,6 +31,11 @@ const TextComment = sequelize.define('TextComment', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     comment: '是否有效'
+  },
+  parentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '父评论ID，支持嵌套回复'
   }
 }, {
   tableName: 'TextComments',

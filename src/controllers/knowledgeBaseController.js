@@ -350,6 +350,70 @@ const searchKnowledgeBaseContent = async (req, res) => {
   }
 };
 
+// 返回知识库所有权限信息 get params:knowledgeBaseId
+const getKnowledgeBasePermissions = async (req, res) => {
+  try {
+    const { knowledgeBaseId } = req.params;
+    // 检查知识库是否存在
+    const knowledgeBase = await KnowledgeBase.findOne({
+      where: { id: knowledgeBaseId, isActive: true },
+      attributes: ["id", "name", "ownerId"],
+    });
+    if (!knowledgeBase) {
+      return res.status(404).json({
+        code: 404,
+        message: "知识库不存在",
+        data: null,
+      });
+    }
+    // 获取所有协作者及权限
+    const collaborations = await Collaboration.findAll({
+      where: { knowledgeBaseId },
+      attributes: ["userId", "permission"],
+    });
+    // 获取所有用户信息
+    const userIds = [
+      knowledgeBase.ownerId,
+      ...collaborations.map((c) => c.userId),
+    ];
+    const users = await User.findAll({
+      where: { id: userIds, isActive: true },
+      attributes: ["id", "username", "email"],
+    });
+    // owner 权限为 owner
+    res.status(200).json({
+      code: 200,
+      message: "操作成功",
+      data: {
+        owner: {
+          userId: knowledgeBase.ownerId,
+          username: users.find((u) => u.id === knowledgeBase.ownerId)?.username,
+          email: users.find((u) => u.id === knowledgeBase.ownerId)?.email,
+          permission: "owner",
+        },
+        collaborators: [
+          ...collaborations.map((c) => {
+            const user = users.find((u) => u.id === c.userId);
+            return {
+              userId: c.userId,
+              username: user?.username,
+              email: user?.email,
+              permission: c.permission,
+            };
+          }),
+        ],
+      },
+    });
+  } catch (error) {
+    console.error("获取知识库权限信息失败:", error);
+    res.status(500).json({
+      code: 500,
+      message: "获取知识库权限信息失败",
+      data: null,
+    });
+  }
+};
+
 // 邀请协作
 // const inviteCollaboration = async (req, res) => {
 //   try {
@@ -696,6 +760,57 @@ const getAllDocumentIds = async (req, res) => {
   }
 };
 
+// 知识库拥有者删除协作人员接口
+const removeKnowledgeBaseCollaborator = async (req, res) => {
+  try {
+    const { knowledgeBaseId, userId } = req.params;
+    const currentUserId = req.user.id;
+    // 检查是否为知识库所有者
+    const knowledgeBase = await KnowledgeBase.findOne({
+      where: { id: knowledgeBaseId, ownerId: currentUserId, isActive: true },
+    });
+    if (!knowledgeBase) {
+      return res.status(403).json({
+        code: 403,
+        message: "无权限操作或知识库不存在",
+        data: null,
+      });
+    }
+    // 不允许删除自己（拥有者）
+    if (userId === currentUserId) {
+      return res.status(400).json({
+        code: 400,
+        message: "不能删除知识库拥有者自己",
+        data: null,
+      });
+    }
+    // 检查协作者关系
+    const collaboration = await Collaboration.findOne({
+      where: { knowledgeBaseId, userId },
+    });
+    if (!collaboration) {
+      return res.status(404).json({
+        code: 404,
+        message: "协作者不存在",
+        data: null,
+      });
+    }
+    await collaboration.destroy();
+    res.status(200).json({
+      code: 200,
+      message: "协作者已移除",
+      data: null,
+    });
+  } catch (error) {
+    console.error("移除协作者失败:", error);
+    res.status(500).json({
+      code: 500,
+      message: "移除协作者失败",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   getAccessibleKnowledgeBases,
   getKnowledgeBaseContent,
@@ -708,4 +823,6 @@ module.exports = {
   checkKnowledgeBaseAccess,
   getAllDocumentIds,
   searchKnowledgeBaseContent,
+  getKnowledgeBasePermissions,
+  removeKnowledgeBaseCollaborator,
 };
