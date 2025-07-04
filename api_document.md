@@ -450,7 +450,8 @@
       "userId": 1,
       "username": "用户名",
       "parentId": null,
-      "createdAt": "2024-01-01T00:00:00.000Z"
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "childCount": "子评论总数"
     }
   ],
   "total": 20,

@@ -242,6 +242,23 @@ const getParentComments = async (req, res) => {
       offset,
       limit: pageSize,
     });
+    // 查询每个父评论的子评论数量
+    const parentIds = rows.map(row => row.id);
+    let childCounts = {};
+    if (parentIds.length > 0) {
+      const childCountArr = await TextComment.findAll({
+        attributes: ['parentId', [TextComment.sequelize.fn('COUNT', TextComment.sequelize.col('id')), 'count']],
+        where: {
+          parentId: parentIds,
+          isActive: true
+        },
+        group: ['parentId']
+      });
+      childCountArr.forEach(item => {
+        childCounts[item.parentId] = parseInt(item.get('count'));
+      });
+    }
+    // 格式化输出，增加 childCount 字段
     const data = rows.map(row => ({
       id: row.id,
       comment: row.comment,
@@ -249,6 +266,7 @@ const getParentComments = async (req, res) => {
       username: row.User?.username,
       parentId: row.parentId,
       createdAt: row.createdAt,
+      childCount: childCounts[row.id] || 0
     }));
     res.json({
       code: 200,
