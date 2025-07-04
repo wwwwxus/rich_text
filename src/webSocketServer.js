@@ -9,9 +9,42 @@ const {
 // 存储文档实例和awareness
 const docs = new Map();
 const awarenessMap = new Map();
+// 存储文档最后活动时间
+const documentActivity = new Map();
 
 // 存储连接的客户端信息
 const clients = new Map();
+
+// 文档超时时间（1小时 = 3600000毫秒）
+const DOCUMENT_TIMEOUT = 60 * 60 * 1000;
+
+// 更新文档活动时间
+function updateDocumentActivity(docname) {
+  documentActivity.set(docname, Date.now());
+}
+
+// 清理超时的文档
+function cleanupTimeoutDocuments() {
+  const now = Date.now();
+  const timeoutDocuments = [];
+
+  documentActivity.forEach((lastActivity, docname) => {
+    if (now - lastActivity > DOCUMENT_TIMEOUT) {
+      timeoutDocuments.push(docname);
+    }
+  });
+
+  timeoutDocuments.forEach((docname) => {
+    console.log(`清理超时文档: ${docname}`);
+    docs.delete(docname);
+    awarenessMap.delete(docname);
+    documentActivity.delete(docname);
+  });
+
+  if (timeoutDocuments.length > 0) {
+    console.log(`已清理 ${timeoutDocuments.length} 个超时文档`);
+  }
+}
 
 // 获取或创建文档
 function getYDoc(docname) {
@@ -23,7 +56,12 @@ function getYDoc(docname) {
     // 为每个文档创建awareness
     const awareness = new Awareness(doc);
     awarenessMap.set(docname, awareness);
+
+    console.log(`创建新文档: ${docname}`);
   }
+
+  // 更新文档活动时间
+  updateDocumentActivity(docname);
   return doc;
 }
 
@@ -46,9 +84,9 @@ function createWebSocketServer(server) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     // const roomname = url.searchParams.get("room") || "collaborative-document";
     // if (!roomname) {
-    // 如果没有 ?room=xxx，则用路径作为房间名
     // 去掉开头的斜杠
-    roomname = url.pathname.replace(/^\//, "") || "collaborative-document";
+    const roomname =
+      url.pathname.replace(/^\//, "") || "collaborative-document";
     console.log(roomname);
     // }
 
@@ -72,12 +110,17 @@ function createWebSocketServer(server) {
       ws.isAlive = true;
       if (clients.has(ws)) {
         clients.get(ws).lastHeartbeat = Date.now();
+        // 更新文档活动时间
+        updateDocumentActivity(roomname);
       }
     });
 
     // 处理消息
     ws.on("message", (message) => {
       try {
+        // 收到任何消息都更新文档活动时间
+        updateDocumentActivity(roomname);
+
         const data = new Uint8Array(message);
 
         if (data[0] === 0) {
@@ -213,10 +256,14 @@ function createWebSocketServer(server) {
 
     console.log(
       `当前WebSocket连接数: ${clients.size}`,
-      clients.keys(),
-      clients.values()
+      `文档数量: ${docs.size}`
     );
   }, 30000);
+
+  // 文档清理定时器，每30分钟检查一次
+  const documentCleanupInterval = setInterval(() => {
+    cleanupTimeoutDocuments();
+  }, 30 * 60 * 1000); // 30分钟
 
   wss.on("error", (error) => {
     console.error("WebSocket 服务器错误:", error);
@@ -226,6 +273,7 @@ function createWebSocketServer(server) {
   const cleanup = () => {
     console.log("正在关闭WebSocket服务器...");
     clearInterval(heartbeatInterval);
+    clearInterval(documentCleanupInterval);
     wss.close(() => {
       console.log("WebSocket服务器已关闭");
     });
