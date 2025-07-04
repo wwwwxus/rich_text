@@ -244,15 +244,11 @@ const getParentComments = async (req, res) => {
     });
     const data = rows.map(row => ({
       id: row.id,
-      textNanoid: row.textNanoid,
       comment: row.comment,
       userId: row.userId,
       username: row.User?.username,
-      documentId: row.documentId,
-      isActive: row.isActive,
       parentId: row.parentId,
       createdAt: row.createdAt,
-      updatedAt: row.updatedAt
     }));
     res.json({
       code: 200,
