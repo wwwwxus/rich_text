@@ -51,8 +51,23 @@ const deleteComment = async (req, res) => {
 // 选中文本评论
 const addTextComment = async (req, res) => {
   try {
-    const { textNanoid, comment, documentId, parentId } = req.body;
+    let { textNanoid, comment, documentId, parentId } = req.body;
     const userId = req.user.id; // 从 token 获取
+
+    // 如果 parentId 存在，则继承父评论的 textNanoid 和 documentId
+    if (parentId) {
+      const parentComment = await TextComment.findOne({
+        where: { id: parentId, isActive: true },
+      });
+      if (!parentComment) {
+        return res.status(400).json({
+          code: 400,
+          message: "父评论不存在或已被删除",
+        });
+      }
+      textNanoid = parentComment.textNanoid;
+      documentId = parentComment.documentId;
+    }
     // 验证文档是否存在
     const document = await Document.findOne({
       where: {
@@ -219,9 +234,133 @@ const getDocumentTextComments = async (req, res) => {
   }
 };
 
+// 获取父评论（parentId为null）
+const getParentComments = async (req, res) => {
+  try {
+    const { textNanoid } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const offset = (page - 1) * pageSize;
+    const { count, rows } = await TextComment.findAndCountAll({
+      where: {
+        textNanoid,
+        parentId: null,
+        isActive: true,
+      },
+      include: [
+        {
+          model: User,
+          attributes: ["username"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      offset,
+      limit: pageSize,
+    });
+    // 查询每个父评论的子评论数量
+    const parentIds = rows.map(row => row.id);
+    let childCounts = {};
+    if (parentIds.length > 0) {
+      const childCountArr = await TextComment.findAll({
+        attributes: ['parentId', [TextComment.sequelize.fn('COUNT', TextComment.sequelize.col('id')), 'count']],
+        where: {
+          parentId: parentIds,
+          isActive: true
+        },
+        group: ['parentId']
+      });
+      childCountArr.forEach(item => {
+        childCounts[item.parentId] = parseInt(item.get('count'));
+      });
+    }
+    // 格式化输出，增加 childCount 字段
+    const data = rows.map(row => ({
+      id: row.id,
+      comment: row.comment,
+      userId: row.userId,
+      username: row.User?.username,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      childCount: childCounts[row.id] || 0
+    }));
+    res.json({
+      code: 200,
+      message: "获取父评论成功",
+      data,
+      total: count,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    console.error("获取父评论错误:", error);
+    res.status(500).json({
+      code: 500,
+      message: "服务器内部错误",
+    });
+  }
+};
+
+// 获取子评论
+const getChildComments = async (req, res) => {
+  try {
+    const { parentId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 5;
+    const offset = (page - 1) * pageSize;
+    const { count, rows } = await TextComment.findAndCountAll({
+      where: {
+        parentId,
+        isActive: true,
+      },
+      include: [
+        {
+          model: User,
+          attributes: ["username"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      offset,
+      limit: pageSize,
+    });
+    let fatherUsername = null;
+    if (rows.length > 0) {
+      const father = await TextComment.findOne({
+        where: { id: parentId },
+        include: [{ model: User, attributes: ["username"] }]
+      });
+      fatherUsername = father && father.User ? father.User.username : null;
+    }
+    const data = rows.map(row => ({
+      id: row.id,
+      comment: row.comment,
+      userId: row.userId,
+      username: row.User?.username,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      fatherUsername
+    }));
+    res.json({
+      code: 200,
+      message: "获取子评论成功",
+      data,
+      total: count,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    console.error("获取子评论错误:", error);
+    res.status(500).json({
+      code: 500,
+      message: "服务器内部错误",
+    });
+  }
+};
+
 module.exports = {
   deleteComment,
   addTextComment,
   getTextComments,
-  getDocumentTextComments
+  getDocumentTextComments,
+  getParentComments,
+  getChildComments
 };

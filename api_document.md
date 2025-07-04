@@ -428,6 +428,71 @@
 }
 ```
 
+// ... existing code ...
+### 4.5 获取父评论（分页）
+
+- **URL**: `GET /api/text-comments/parents/:textNanoid`
+- **描述**: 获取指定文本片段的所有父评论（parentId为null），支持分页
+- **参数**:
+  - `textNanoid` (路径参数): 文本的唯一标识
+  - `page` (查询参数，可选): 页码，默认1
+  - `pageSize` (查询参数，可选): 每页数量，默认10
+- **返回**:
+
+```json
+{
+  "code": 200,
+  "message": "获取父评论成功",
+  "data": [
+    {
+      "id": 1,
+      "comment": "父评论内容",
+      "userId": 1,
+      "username": "用户名",
+      "parentId": null,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "childCount": "子评论总数"
+    }
+  ],
+  "total": 20,
+  "page": 1,
+  "pageSize": 10
+}
+```
+
+// ... existing code ...
+### 4.6 获取子评论（分页）
+
+- **URL**: `GET /api/text-comments/children/:parentId`
+- **描述**: 获取指定父评论下的子评论，支持分页。每条子评论包含 fatherUsername 字段，表示其父评论的用户名。
+- **参数**:
+  - `parentId` (路径参数): 父评论ID
+  - `page` (查询参数，可选): 页码，默认1
+  - `pageSize` (查询参数，可选): 每页数量，默认5
+- **返回**:
+
+```json
+{
+  "code": 200,
+  "message": "获取子评论成功",
+  "data": [
+    {
+      "id": 2,
+      "comment": "子评论内容",
+      "userId": 2,
+      "username": "协作者",
+      "parentId": 1,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "fatherUsername": "父评论用户名"
+    }
+  ],
+  "total": 8,
+  "page": 1,
+  "pageSize": 5
+}
+```
+
+
 ## 5. 版本管理接口
 
 ### 版本管理说明

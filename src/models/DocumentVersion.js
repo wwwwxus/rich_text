@@ -20,11 +20,17 @@ const DocumentVersion = sequelize.define('DocumentVersion', {
   },
   content: {
     type: DataTypes.TEXT('long'),
+    allowNull: true, // 允许为 null
+    comment: '基线版本存全文，增量版本为 null'
+  },
+  isFull: {
+    type: DataTypes.BOOLEAN,
     allowNull: false,
-    comment: '该版本的内容'
+    defaultValue: false,
+    comment: '是否为基线版本（全文存储）'
   },
   diff: {
-    type: DataTypes.TEXT,
+    type: DataTypes.TEXT('long'),
     allowNull: true,
     comment: '与上一版本的差别'
   },
