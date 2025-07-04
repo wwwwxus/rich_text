@@ -53,7 +53,7 @@ const addTextComment = async (req, res) => {
   try {
     let { textNanoid, comment, documentId, parentId } = req.body;
     const userId = req.user.id; // 从 token 获取
-
+    console.log(parentId)
     // 如果 parentId 存在，则继承父评论的 textNanoid 和 documentId
     if (parentId) {
       const parentComment = await TextComment.findOne({
@@ -257,32 +257,16 @@ const getParentComments = async (req, res) => {
       offset,
       limit: pageSize,
     });
-    // 查询每个父评论的子评论数量
-    const parentIds = rows.map(row => row.id);
-    let childCounts = {};
-    if (parentIds.length > 0) {
-      const childCountArr = await TextComment.findAll({
-        attributes: ['parentId', [TextComment.sequelize.fn('COUNT', TextComment.sequelize.col('id')), 'count']],
-        where: {
-          parentId: parentIds,
-          isActive: true
-        },
-        group: ['parentId']
-      });
-      childCountArr.forEach(item => {
-        childCounts[item.parentId] = parseInt(item.get('count'));
-      });
-    }
-    // 格式化输出，增加 childCount 字段
-    const data = rows.map(row => ({
+    // 格式化输出，增加 childCount 字段（递归统计所有子孙评论数）
+    const data = await Promise.all(rows.map(async row => ({
       id: row.id,
       comment: row.comment,
       userId: row.userId,
       username: row.User?.username,
       parentId: row.parentId,
       createdAt: row.createdAt,
-      childCount: childCounts[row.id] || 0
-    }));
+      childCount: await countDescendants(row.id)
+    })));
     res.json({
       code: 200,
       message: "获取父评论成功",
@@ -300,44 +284,83 @@ const getParentComments = async (req, res) => {
   }
 };
 
-// 获取子评论
+// 递归收集所有子孙评论id
+async function collectDescendantIds(parentId) {
+  const children = await TextComment.findAll({
+    where: { parentId, isActive: true },
+    attributes: ['id'],
+  });
+  let ids = [];
+  for (const child of children) {
+    ids.push(child.id);
+    const subIds = await collectDescendantIds(child.id);
+    ids = ids.concat(subIds);
+  }
+  return ids;
+}
+
+// 递归统计所有子孙评论数量
+async function countDescendants(parentId) {
+  const children = await TextComment.findAll({
+    where: { parentId, isActive: true },
+    attributes: ['id'],
+  });
+  let count = children.length;
+  for (const child of children) {
+    count += await countDescendants(child.id);
+  }
+  return count;
+}
+
+// 获取子评论（扁平化+分页，不含树结构）
 const getChildComments = async (req, res) => {
   try {
     const { parentId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 5;
-    const offset = (page - 1) * pageSize;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    // 递归收集所有子孙评论id
+    const allIds = await collectDescendantIds(parentId);
+    if (allIds.length === 0) {
+      return res.json({
+        code: 200,
+        message: "获取子评论成功",
+        data: [],
+        total: 0,
+        page,
+        pageSize
+      });
+    }
+    // 分页查询所有子孙评论
     const { count, rows } = await TextComment.findAndCountAll({
       where: {
-        parentId,
+        id: allIds,
         isActive: true,
       },
       include: [
-        {
-          model: User,
-          attributes: ["username"],
-        },
+        { model: User, attributes: ["username"] },
       ],
       order: [["createdAt", "ASC"]],
-      offset,
+      offset: (page - 1) * pageSize,
       limit: pageSize,
     });
-    let fatherUsername = null;
-    if (rows.length > 0) {
-      const father = await TextComment.findOne({
-        where: { id: parentId },
-        include: [{ model: User, attributes: ["username"] }]
-      });
-      fatherUsername = father && father.User ? father.User.username : null;
-    }
-    const data = rows.map(row => ({
-      id: row.id,
-      comment: row.comment,
-      userId: row.userId,
-      username: row.User?.username,
-      parentId: row.parentId,
-      createdAt: row.createdAt,
-      fatherUsername
+    const data = await Promise.all(rows.map(async row => {
+      let fatherName = null;
+      if (row.parentId) {
+        const father = await TextComment.findOne({
+          where: { id: row.parentId },
+          include: [{ model: User, attributes: ["username"] }]
+        });
+        fatherName = father && father.User ? father.User.username : null;
+      }
+      return {
+        id: row.id,
+        comment: row.comment,
+        userId: row.userId,
+        username: row.User?.username,
+        parentId: row.parentId,
+        createdAt: row.createdAt,
+        fatherName
+      };
     }));
     res.json({
       code: 200,
