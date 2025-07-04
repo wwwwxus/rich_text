@@ -18,6 +18,14 @@ router.get('/document/:documentId', textCommentController.getDocumentTextComment
 // GET /api/text-comments/:textNanoid
 router.get('/:textNanoid', textCommentController.getTextComments);
 
+// 获取父评论（分页）
+// GET /api/text-comments/parents/:textNanoid
+router.get('/parents/:textNanoid', textCommentController.getParentComments);
+
+// 获取子评论（分页）
+// GET /api/text-comments/children/:parentId
+router.get('/children/:parentId', textCommentController.getChildComments);
+
 // 删除评论
 // DELETE /api/text-comments/:commentId
 router.delete('/:commentId', textCommentController.deleteComment);
