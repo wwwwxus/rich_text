@@ -51,8 +51,23 @@ const deleteComment = async (req, res) => {
 // 选中文本评论
 const addTextComment = async (req, res) => {
   try {
-    const { textNanoid, comment, documentId, parentId } = req.body;
+    let { textNanoid, comment, documentId, parentId } = req.body;
     const userId = req.user.id; // 从 token 获取
+
+    // 如果 parentId 存在，则继承父评论的 textNanoid 和 documentId
+    if (parentId) {
+      const parentComment = await TextComment.findOne({
+        where: { id: parentId, isActive: true },
+      });
+      if (!parentComment) {
+        return res.status(400).json({
+          code: 400,
+          message: "父评论不存在或已被删除",
+        });
+      }
+      textNanoid = parentComment.textNanoid;
+      documentId = parentComment.documentId;
+    }
     // 验证文档是否存在
     const document = await Document.findOne({
       where: {
