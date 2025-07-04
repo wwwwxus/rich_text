@@ -229,14 +229,6 @@ const createDocument = async (req, res) => {
       updatedAt: new Date(),
     });
 
-    // 创建初始版本记录
-    await DocumentVersion.create({
-      documentId: document.id,
-      versionNumber: 1,
-      content: "",
-      diff: "初始版本",
-      savedAt: new Date(),
-    });
 
     res.status(200).json({
       code: 200,

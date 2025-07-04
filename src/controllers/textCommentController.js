@@ -234,9 +234,115 @@ const getDocumentTextComments = async (req, res) => {
   }
 };
 
+// 获取父评论（parentId为null）
+const getParentComments = async (req, res) => {
+  try {
+    const { textNanoid } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const offset = (page - 1) * pageSize;
+    const { count, rows } = await TextComment.findAndCountAll({
+      where: {
+        textNanoid,
+        parentId: null,
+        isActive: true,
+      },
+      include: [
+        {
+          model: User,
+          attributes: ["username"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      offset,
+      limit: pageSize,
+    });
+    const data = rows.map(row => ({
+      id: row.id,
+      comment: row.comment,
+      userId: row.userId,
+      username: row.User?.username,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+    }));
+    res.json({
+      code: 200,
+      message: "获取父评论成功",
+      data,
+      total: count,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    console.error("获取父评论错误:", error);
+    res.status(500).json({
+      code: 500,
+      message: "服务器内部错误",
+    });
+  }
+};
+
+// 获取子评论
+const getChildComments = async (req, res) => {
+  try {
+    const { parentId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 5;
+    const offset = (page - 1) * pageSize;
+    const { count, rows } = await TextComment.findAndCountAll({
+      where: {
+        parentId,
+        isActive: true,
+      },
+      include: [
+        {
+          model: User,
+          attributes: ["username"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      offset,
+      limit: pageSize,
+    });
+    let fatherUsername = null;
+    if (rows.length > 0) {
+      const father = await TextComment.findOne({
+        where: { id: parentId },
+        include: [{ model: User, attributes: ["username"] }]
+      });
+      fatherUsername = father && father.User ? father.User.username : null;
+    }
+    const data = rows.map(row => ({
+      id: row.id,
+      comment: row.comment,
+      userId: row.userId,
+      username: row.User?.username,
+      parentId: row.parentId,
+      createdAt: row.createdAt,
+      fatherUsername
+    }));
+    res.json({
+      code: 200,
+      message: "获取子评论成功",
+      data,
+      total: count,
+      page,
+      pageSize
+    });
+  } catch (error) {
+    console.error("获取子评论错误:", error);
+    res.status(500).json({
+      code: 500,
+      message: "服务器内部错误",
+    });
+  }
+};
+
 module.exports = {
   deleteComment,
   addTextComment,
   getTextComments,
-  getDocumentTextComments
+  getDocumentTextComments,
+  getParentComments,
+  getChildComments
 };

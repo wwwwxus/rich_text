@@ -3,13 +3,20 @@ const Document = require('../models/Document');
 const auth = require('../middleware/auth');
 const checkKnowledgeBaseAccess = require('./knowledgeBaseController').checkKnowledgeBaseAccess;
 const JsDiff = require('diff');
-const { diffWords } = JsDiff;
+const {  applyPatch } = JsDiff;
+const { Op } = require('sequelize');
+
+const BASELINE_INTERVAL = 5 // 每5个版本存一次全文
 
 // 自动创建版本（内部函数，供文档保存时调用）
 const createVersion = async (documentId, content) => {
   try {
+    if (!content) {
+      throw new Error('创建版本失败：内容不能为空')
+    }
+
     // 使用 Sequelize 的 max 函数，直接获取数据库中最大的版本号
-    // 这能确保无论版本是否被软删除,解决唯一键冲突问题
+    // 确保无论版本是否被软删除,解决唯一键冲突问题
     const maxVersionNumber = await DocumentVersion.max('versionNumber', {
       where: { documentId }
     });
@@ -25,46 +32,28 @@ const createVersion = async (documentId, content) => {
     });
 
     // 计算与上一版本的差异
-    let diff = '';
-    if (previousVersion) {
-      diff = calculateDiff(previousVersion.content, content);
-    } else {
-      diff = '初始版本';
+    // 若内容与上一版本完全相同，不创建新版本
+    if (previousVersion && previousVersion.content === content) {
+      return previousVersion // 返回上一版本，避免重复
     }
 
     // 创建新版本
     const newVersion = await DocumentVersion.create({
       documentId,
       versionNumber: newVersionNumber,
-      content,
+      content: contentToSave,
       diff,
+      isFull,
       savedAt: new Date()
-    });
+    })
 
     return newVersion;
   } catch (error) {
     console.error('创建版本错误:', error);
     throw error;
   }
-};
+}
 
-// 简单的文本差异计算函数
-const calculateDiff = (oldContent, newContent) => {
-  if (!oldContent) return '初始版本';
-  if (oldContent === newContent) return '内容无变化';
-
-  // 简单的差异计算（实际项目中可以使用更复杂的diff算法）
-  const oldLength = oldContent.length;
-  const newLength = newContent.length;
-
-  if (newLength > oldLength) {
-    return `内容增加 ${newLength - oldLength} 个字符`;
-  } else if (newLength < oldLength) {
-    return `内容减少 ${oldLength - newLength} 个字符`;
-  } else {
-    return '内容被修改';
-  }
-};
 
 // 查看版本列表
 const getVersions = async (req, res) => {
@@ -159,7 +148,7 @@ const getVersionContent = async (req, res) => {
         id: version.id,
         documentId: version.documentId,
         versionNumber: version.versionNumber,
-        content: version.content,
+        content,
         diff: version.diff,
         savedAt: version.savedAt,
         createdAt: version.createdAt
@@ -177,9 +166,8 @@ const getVersionContent = async (req, res) => {
 // 回退版本
 const rollbackVersion = async (req, res) => {
   try {
-    const { documentId, versionNumber } = req.params;
-    const userId = req.user.id;
-    console.log('userId', userId);
+    const { documentId, versionNumber } = req.params
+    const userId = req.user.id
 
     // 验证文档是否存在
     const document = await Document.findOne({
@@ -221,14 +209,19 @@ const rollbackVersion = async (req, res) => {
       });
     }
 
-    // 更新文档内容为目标版本的内容
+    // 获取完整内容（无论基线还是增量）
+    const restoredContent = targetVersion.content
+      ? targetVersion.content
+      : await restoreVersionContent(documentId, versionNumber)
+
+    // 更新文档内容
     await document.update({
-      content: targetVersion.content,
+      content: restoredContent,
       updatedAt: new Date()
     });
 
     // 创建新的版本记录（回退操作）
-    const newVersion = await createVersion(documentId, targetVersion.content, userId);
+    const newVersion = await createVersion(documentId, restoredContent, userId)
 
     res.json({
       code: 200,
@@ -237,7 +230,7 @@ const rollbackVersion = async (req, res) => {
         documentId,
         rollbackToVersion: parseInt(versionNumber),
         newVersionNumber: newVersion.versionNumber,
-        content: targetVersion.content,
+        content: restoredContent,
         updatedAt: document.updatedAt
       }
     });
@@ -299,8 +292,8 @@ const deleteVersion = async (req, res) => {
       });
     }
 
-    // 软删除版本
-    await version.update({ isActive: false });
+    // 软删除版本，为了统计历史版本数
+    await version.update({ isActive: false })
 
     res.json({
       code: 200,
@@ -319,37 +312,45 @@ const deleteVersion = async (req, res) => {
 };
 
 
-
+// 对比两个版本
 const compareVersions = async (req, res) => {
   try {
-    const { documentId, versionNumber1, versionNumber2 } = req.params 
+    const { documentId, versionNumber1, versionNumber2 } = req.params
 
+    // 获取完整内容（无论基线还是增量）
     const version1 = await DocumentVersion.findOne({
       where: { documentId, versionNumber: versionNumber1, isActive: true }
-    }) 
-
+    })
     const version2 = await DocumentVersion.findOne({
       where: { documentId, versionNumber: versionNumber2, isActive: true }
-    }) 
+    })
 
     if (!version1 || !version2) {
-      return res.status(404).json({ code: 404, message: '一个或两个版本不存在' }) 
+      return res.status(404).json({ code: 404, message: '一个或两个版本不存在' })
     }
 
-    let json1, json2 
+    // 获取完整内容
+    const content1 = version1.content
+      ? version1.content
+      : await restoreVersionContent(documentId, versionNumber1)
+    const content2 = version2.content
+      ? version2.content
+      : await restoreVersionContent(documentId, versionNumber2)
+
+    let json1, json2
     try {
-      json1 = JSON.parse(version1.content) 
+      json1 = JSON.parse(content1)
     } catch (e) {
-      json1 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version1.content }] }] } 
+      json1 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: content1 }] }] }
     }
     try {
-      json2 = JSON.parse(version2.content) 
+      json2 = JSON.parse(content2)
     } catch (e) {
-      json2 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: version2.content }] }] } 
+      json2 = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: content2 }] }] }
     }
 
     // 递归对比，保留所有结构
-    const diffResult = diffNodes(json1, json2) 
+    const diffResult = diffNodes(json1, json2)
 
     res.json({
       code: 200,
@@ -357,24 +358,94 @@ const compareVersions = async (req, res) => {
       data: {
         tiptap: JSON.stringify(diffResult)
       }
-    }) 
+    })
   } catch (error) {
-    console.error('版本对比错误:', error) 
-    res.status(500).json({ code: 500, message: '服务器内部错误' }) 
+    console.error('版本对比错误:', error)
+    res.status(500).json({ code: 500, message: '服务器内部错误' })
   }
-} 
+};
+
+// LCS算法，返回公共索引对
+function lcs(a, b, eq) {
+  const m = a.length, n = b.length;
+  const dp = Array(m + 1).fill().map(() => Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      if (eq(a[i], b[j])) dp[i][j] = dp[i + 1][j + 1] + 1;
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  // 回溯LCS索引
+  let i = 0, j = 0, res = [];
+  while (i < m && j < n) {
+    if (eq(a[i], b[j])) {
+      res.push([i, j]);
+      i++; j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else j++;
+  }
+  return res;
+}
+
+// 对 content 数组做 diff，支持插入/移动识别
+function diffContentArray(arr1, arr2) {
+  // 判断节点是否相等（可根据 type、attrs、text 等自定义）
+  const eq = (n1, n2) => {
+    if (!n1 || !n2) return false;
+    if (n1.type !== n2.type) return false;
+    if (n1.type === 'text' && n2.type === 'text') {
+      return n1.text === n2.text;
+    }
+    return JSON.stringify(n1.attrs || {}) === JSON.stringify(n2.attrs || {});
+  };
+  const lcsPairs = lcs(arr1, arr2, eq);
+  let i1 = 0, i2 = 0, lcsIdx = 0, result = [];
+  while (i1 < arr1.length || i2 < arr2.length) {
+    if (lcsIdx < lcsPairs.length && i1 === lcsPairs[lcsIdx][0] && i2 === lcsPairs[lcsIdx][1]) {
+      // 公共部分递归diff
+      const diffed = diffNodes(arr1[i1], arr2[i2]);
+      if (Array.isArray(diffed)) {
+        result.push(...diffed);
+      } else if (diffed) {
+        result.push(diffed);
+      }
+      i1++; i2++; lcsIdx++;
+    } else {
+      if (lcsIdx < lcsPairs.length && i1 < lcsPairs[lcsIdx][0]) {
+        // arr1中多余，删除
+        result.push({ ...arr1[i1], marks: [...(arr1[i1].marks || []), { type: 'remove' }] });
+        i1++;
+      } else if (lcsIdx < lcsPairs.length && i2 < lcsPairs[lcsIdx][1]) {
+        // arr2中多余，新增
+        result.push({ ...arr2[i2], marks: [...(arr2[i2].marks || []), { type: 'add' }] });
+        i2++;
+      } else {
+        // 剩余部分
+        if (i1 < arr1.length) {
+          result.push({ ...arr1[i1], marks: [...(arr1[i1].marks || []), { type: 'remove' }] });
+          i1++;
+        }
+        if (i2 < arr2.length) {
+          result.push({ ...arr2[i2], marks: [...(arr2[i2].marks || []), { type: 'add' }] });
+          i2++;
+        }
+      }
+    }
+  }
+  return result;
+}
 
 function diffNodes(node1, node2) {
-  if (!node1 && !node2) return null 
-  if (!node1) return { ...node2, marks: [...(node2.marks || []), { type: 'add' }] } 
-  if (!node2) return { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] } 
+  if (!node1 && !node2) return null
+  if (!node1) return { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
+  if (!node2) return { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] }
 
   if (node1.type !== node2.type) {
     // 类型不同，全部标记为删除和新增
     return [
       { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] },
       { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
-    ] 
+    ]
   }
 
   if (node1.type === 'text' && node2.type === 'text') {
@@ -402,32 +473,48 @@ function diffNodes(node1, node2) {
     return result;
   }
 
-  // 递归对比子节点
-  if (node1.content && node2.content) {
-    const length = Math.max(node1.content.length, node2.content.length);
-    const newContent = [];
-    for (let i = 0; i < length; i++) {
-      const diffed = diffNodes(node1.content[i], node2.content[i]);
-      if (Array.isArray(diffed)) {
-        newContent.push(...diffed);
-      } else if (diffed) {
-        newContent.push(diffed);
-      }
-    }
-    return { ...node1, content: newContent };
+  // 递归对比子节点，使用LCS优化,避免只有顺序变化却加上mark
+  if (Array.isArray(node1.content) && Array.isArray(node2.content)) {
+    return { ...node1, content: diffContentArray(node1.content, node2.content) }
   }
+
+  // 结构相同但没有content，直接返回node2
+  return node2
 }
 
-// 递归给所有文本节点加 mark
-function markAllTextNodes(node, mark) {
-  if (!node) return node;
-  if (node.type === 'text') {
-    return { ...node, marks: [...(node.marks || []), mark] };
+
+// 恢复版本内容
+// 从基线版本开始，依次应用增量diff，直到目标版本
+async function restoreVersionContent(documentId, versionNumber) {
+  // 1. 找到 <= versionNumber 的最近 isFull=true 的版本
+  const baselineVersion = await DocumentVersion.findOne({
+    where: {
+      documentId,
+      versionNumber: { [Op.lte]: versionNumber },
+      isFull: true
+    },
+    order: [['versionNumber', 'DESC']]
+  })
+
+  if (!baselineVersion) throw new Error('未找到基线版本')
+
+  let content = baselineVersion.content
+  let currentVersion = baselineVersion.versionNumber
+
+  // 2. 依次获取后续diff，应用到基线内容上
+  while (currentVersion < versionNumber) {
+    const nextVersion = await DocumentVersion.findOne({
+      where: { documentId, versionNumber: currentVersion + 1 }
+    })
+    if (!nextVersion) throw new Error('版本链断裂')
+    if (nextVersion.diff) {
+      content = applyPatch(content, nextVersion.diff)
+    } else if (nextVersion.content) {
+      content = nextVersion.content // 兼容老数据
+    }
+    currentVersion++
   }
-  if (Array.isArray(node.content)) {
-    return { ...node, content: node.content.map(child => markAllTextNodes(child, mark)) };
-  }
-  return node;
+  return content
 }
 
 module.exports = {
