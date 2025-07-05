@@ -93,14 +93,14 @@ const saveDocument = async (req, res) => {
       });
     }
 
+    // 自动创建新版本
+    const newVersion = await createVersion(documentId, newContent);
     // 更新文档内容
     await document.update({
       content: newContent,
       updatedAt: new Date(),
     });
 
-    // 自动创建新版本
-    const newVersion = await createVersion(documentId, newContent);
 
     res.json({
       code: 200,

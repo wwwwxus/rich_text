@@ -3,7 +3,6 @@ const Document = require('../models/Document');
 const auth = require('../middleware/auth');
 const checkKnowledgeBaseAccess = require('./knowledgeBaseController').checkKnowledgeBaseAccess;
 const JsDiff = require('diff');
-const {  applyPatch } = JsDiff;
 const { Op } = require('sequelize');
 
 const BASELINE_INTERVAL = 5 // 每5个版本存一次全文
@@ -24,10 +23,10 @@ const createVersion = async (documentId, content) => {
     const newVersionNumber = (maxVersionNumber || 0) + 1;
 
     // 获取上一个版本的内容用于 diff 计算
-    const previousVersion = await DocumentVersion.findOne({
+    const previousVersion = await Document.findOne({
       where: {
-        documentId,
-        versionNumber: maxVersionNumber
+        id:documentId,
+        isActive: true
       }
     });
 
@@ -36,6 +35,26 @@ const createVersion = async (documentId, content) => {
     if (previousVersion && previousVersion.content === content) {
       return previousVersion // 返回上一版本，避免重复
     }
+    // 判断是否为基线版本（每 BASELINE_INTERVAL 个版本存一次全文）
+    const isFull = newVersionNumber % BASELINE_INTERVAL === 1
+
+    //  计算与上一版本的差异（仅非基线版本需要）
+    let diff = null
+    if (previousVersion && !isFull) {
+    const prevContentStr = typeof previousVersion.content === 'string'
+      ? previousVersion.content
+      : JSON.stringify(previousVersion.content, null, 0)
+
+    const contentStr = typeof content === 'string'
+      ? content
+      : JSON.stringify(content, null, 0)
+
+    diff = JsDiff.createPatch('doc', prevContentStr, contentStr)
+  }
+
+
+    // 确定要保存的内容（基线版本存全文，增量版本存 null）
+    const contentToSave = isFull ? content : null
 
     // 创建新版本
     const newVersion = await DocumentVersion.create({
@@ -148,7 +167,7 @@ const getVersionContent = async (req, res) => {
         id: version.id,
         documentId: version.documentId,
         versionNumber: version.versionNumber,
-        content,
+        content: version.content || await restoreVersionContent(documentId, versionNumber),
         diff: version.diff,
         savedAt: version.savedAt,
         createdAt: version.createdAt
@@ -398,6 +417,7 @@ function diffContentArray(arr1, arr2) {
     }
     return JSON.stringify(n1.attrs || {}) === JSON.stringify(n2.attrs || {});
   };
+
   const lcsPairs = lcs(arr1, arr2, eq);
   let i1 = 0, i2 = 0, lcsIdx = 0, result = [];
   while (i1 < arr1.length || i2 < arr2.length) {
@@ -432,31 +452,42 @@ function diffContentArray(arr1, arr2) {
       }
     }
   }
+
   return result;
+}
+
+
+function markAll(node, type) {
+  if (!node) return null
+  const newNode = { ...node }
+  newNode.marks = [...(newNode.marks || []), { type }]
+  if (Array.isArray(newNode.content)) {
+    newNode.content = newNode.content.map(child => markAll(child, type))
+  }
+  return newNode
 }
 
 function diffNodes(node1, node2) {
   if (!node1 && !node2) return null
-  if (!node1) return { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
-  if (!node2) return { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] }
+  if (!node1) return markAll(node2, 'add')
+  if (!node2) return markAll(node1, 'remove')
 
   if (node1.type !== node2.type) {
-    // 类型不同，全部标记为删除和新增
     return [
-      { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] },
-      { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
+      markAll(node1, 'remove'),
+      markAll(node2, 'add')
     ]
   }
 
   if (node1.type === 'text' && node2.type === 'text') {
-    const textEqual = (node1.text || '') === (node2.text || '');
-    const marksEqual = JSON.stringify(node1.marks || []) === JSON.stringify(node2.marks || []);
+    const textEqual = (node1.text || '') === (node2.text || '')
+    const marksEqual = JSON.stringify(node1.marks || []) === JSON.stringify(node2.marks || [])
     if (textEqual && !marksEqual) {
       // 样式不同，全部标记为删除和新增
       return [
-        { ...node1, marks: [...(node1.marks || []), { type: 'remove' }] },
-        { ...node2, marks: [...(node2.marks || []), { type: 'add' }] }
-      ];
+        markAll(node1, 'remove'),
+        markAll(node2, 'add')
+      ]
     }
     // 内容不同，按字符 diff
     const diff = JsDiff.diffChars(node1.text || '', node2.text || '');
@@ -485,37 +516,57 @@ function diffNodes(node1, node2) {
 
 // 恢复版本内容
 // 从基线版本开始，依次应用增量diff，直到目标版本
+
 async function restoreVersionContent(documentId, versionNumber) {
-  // 1. 找到 <= versionNumber 的最近 isFull=true 的版本
+  // 从数据库中查找 <= versionNumber 的最新基线版本（isFull = true）
+  // 这样避免逐条回溯所有diff，可以从最近完整版本开始还原
   const baselineVersion = await DocumentVersion.findOne({
     where: {
       documentId,
       versionNumber: { [Op.lte]: versionNumber },
       isFull: true
     },
-    order: [['versionNumber', 'DESC']]
+    order: [['versionNumber', 'DESC']]  // 按版本号降序，取最新
   })
-
   if (!baselineVersion) throw new Error('未找到基线版本')
 
-  let content = baselineVersion.content
+  // 确保基线版本的内容是字符串格式
+  // 如果存储时已经是 JSON 字符串就直接用，否则需要 JSON.stringify 转换
+  let contentStr = typeof baselineVersion.content === 'string'
+    ? baselineVersion.content
+    : JSON.stringify(baselineVersion.content, null, 0)
+
+  // 当前版本号从基线开始
   let currentVersion = baselineVersion.versionNumber
 
-  // 2. 依次获取后续diff，应用到基线内容上
+  // 依次向上应用增量diff，直到目标versionNumber
   while (currentVersion < versionNumber) {
+    // 查询下一个版本号
     const nextVersion = await DocumentVersion.findOne({
       where: { documentId, versionNumber: currentVersion + 1 }
     })
-    if (!nextVersion) throw new Error('版本链断裂')
+    if (!nextVersion) throw new Error('版本链断裂') 
+    // 如果中间缺少某个版本就会导致无法正确还原
+
+    // 如果该版本只存储了diff，则基于当前内容应用patch
     if (nextVersion.diff) {
-      content = applyPatch(content, nextVersion.diff)
+      contentStr = JsDiff.applyPatch(contentStr, nextVersion.diff)
     } else if (nextVersion.content) {
-      content = nextVersion.content // 兼容老数据
+      // 否则该版本是一个完整快照，直接替换
+      contentStr = typeof nextVersion.content === 'string'
+        ? nextVersion.content
+        : JSON.stringify(nextVersion.content, null, 0)
     }
+
+    // 继续到下一个版本号
     currentVersion++
   }
-  return content
+
+  // 返回还原后的完整文档内容（此处保留字符串）
+  return contentStr
 }
+
+
 
 module.exports = {
   createVersion,
