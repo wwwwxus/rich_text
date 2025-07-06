@@ -5,6 +5,7 @@ const Document = require("../models/Document");
 const RecentAccess = require("../models/RecentAccess");
 const User = require("../models/User");
 const { Op, fn, col } = require("sequelize");
+const { permission } = require("process");
 
 // 获取可访问的知识库信息
 const getAccessibleKnowledgeBases = async (req, res) => {
@@ -581,7 +582,7 @@ const getRecentKnowledgeBases = async (req, res) => {
         id: { [Op.in]: recentKBIds },
         isActive: true,
       },
-      attributes: ["id", "name", "description"],
+      attributes: ["id", "name", "description","ownerId"],
     });
 
     // 将知识库详情映射到其ID，方便查找
@@ -598,6 +599,7 @@ const getRecentKnowledgeBases = async (req, res) => {
             description: knowledgeBase.description,
             // 使用 .get() 来获取聚合查询的别名(alias)字段
             lastAccessedAt: access.get("maxLastAccessedAt"),
+            isOwner: knowledgeBase.ownerId === userId, // 判断是否是owner
           };
         }
         return null;
