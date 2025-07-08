@@ -30,7 +30,7 @@ const DocumentVersion = sequelize.define('DocumentVersion', {
     comment: '是否为基线版本（全文存储）'
   },
   diff: {
-    type: DataTypes.TEXT('long'),
+    type: DataTypes.JSON,
     allowNull: true,
     comment: '与上一版本的差别'
   },

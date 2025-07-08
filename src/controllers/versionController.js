@@ -4,11 +4,12 @@ const auth = require('../middleware/auth');
 const checkKnowledgeBaseAccess = require('./knowledgeBaseController').checkKnowledgeBaseAccess;
 const JsDiff = require('diff');
 const { Op } = require('sequelize');
-
+const { generateSegmentDiffs, splitContent } = require('../utils/segmentDiff');
 const BASELINE_INTERVAL = 5 // 每5个版本存一次全文
 
 // 自动创建版本（内部函数，供文档保存时调用）
 const createVersion = async (documentId, content) => {
+  let diff = null; // 提前声明
   try {
     if (!content) {
       throw new Error('创建版本失败：内容不能为空')
@@ -23,35 +24,41 @@ const createVersion = async (documentId, content) => {
     const newVersionNumber = (maxVersionNumber || 0) + 1;
 
     // 获取上一个版本的内容用于 diff 计算
-    const previousVersion = await Document.findOne({
-      where: {
-        id:documentId,
-        isActive: true
-      }
+    const previousVersion = await DocumentVersion.findOne({
+      where: { documentId },
+      order: [['versionNumber', 'DESC']]
     });
 
     // 计算与上一版本的差异
     // 若内容与上一版本完全相同，不创建新版本
-    if (previousVersion && previousVersion.content === content) {
+    let prevContentStr = '';
+    if (previousVersion) {
+      if (previousVersion.content) {
+        prevContentStr = typeof previousVersion.content === 'string'
+          ? previousVersion.content
+          : JSON.stringify(previousVersion.content, null, 0);
+      } else {
+        // 增量版本，需还原全文
+        prevContentStr = await restoreVersionContent(documentId, previousVersion.versionNumber);
+      }
+    }
+    // 保证 prevContentStr 一定是字符串且不为 "null"
+    if (prevContentStr === null || prevContentStr === undefined) {
+      prevContentStr = '';
+    }
+    const contentStr = typeof content === 'string'
+      ? content
+      : JSON.stringify(content, null, 0);
+    if (previousVersion && prevContentStr === contentStr) {
       return previousVersion // 返回上一版本，避免重复
     }
     // 判断是否为基线版本（每 BASELINE_INTERVAL 个版本存一次全文）
     const isFull = newVersionNumber % BASELINE_INTERVAL === 1
 
     //  计算与上一版本的差异（仅非基线版本需要）
-    let diff = null
     if (previousVersion && !isFull) {
-    const prevContentStr = typeof previousVersion.content === 'string'
-      ? previousVersion.content
-      : JSON.stringify(previousVersion.content, null, 0)
-
-    const contentStr = typeof content === 'string'
-      ? content
-      : JSON.stringify(content, null, 0)
-
-    diff = JsDiff.createPatch('doc', prevContentStr, contentStr)
-  }
-
+      diff = generateSegmentDiffs(prevContentStr, contentStr);
+    }
 
     // 确定要保存的内容（基线版本存全文，增量版本存 null）
     const contentToSave = isFull ? content : null
@@ -412,8 +419,9 @@ function diffContentArray(arr1, arr2) {
   const eq = (n1, n2) => {
     if (!n1 || !n2) return false;
     if (n1.type !== n2.type) return false;
+    // 对于 text 节点，只比较 type，不比较 text 内容
     if (n1.type === 'text' && n2.type === 'text') {
-      return n1.text === n2.text;
+      return true;
     }
     return JSON.stringify(n1.attrs || {}) === JSON.stringify(n2.attrs || {});
   };
@@ -480,16 +488,7 @@ function diffNodes(node1, node2) {
   }
 
   if (node1.type === 'text' && node2.type === 'text') {
-    const textEqual = (node1.text || '') === (node2.text || '')
-    const marksEqual = JSON.stringify(node1.marks || []) === JSON.stringify(node2.marks || [])
-    if (textEqual && !marksEqual) {
-      // 样式不同，全部标记为删除和新增
-      return [
-        markAll(node1, 'remove'),
-        markAll(node2, 'add')
-      ]
-    }
-    // 内容不同，按字符 diff
+    // 用 diffChars
     const diff = JsDiff.diffChars(node1.text || '', node2.text || '');
     const result = [];
     diff.forEach(part => {
@@ -545,12 +544,30 @@ async function restoreVersionContent(documentId, versionNumber) {
     const nextVersion = await DocumentVersion.findOne({
       where: { documentId, versionNumber: currentVersion + 1 }
     })
-    if (!nextVersion) throw new Error('版本链断裂') 
+    if (!nextVersion) throw new Error('版本链断裂')
     // 如果中间缺少某个版本就会导致无法正确还原
 
     // 如果该版本只存储了diff，则基于当前内容应用patch
     if (nextVersion.diff) {
-      contentStr = JsDiff.applyPatch(contentStr, nextVersion.diff)
+      let diffObj = nextVersion.diff;
+      if (typeof diffObj === 'string') {
+        try { diffObj = JSON.parse(diffObj); } catch { }
+      }
+      if (diffObj && diffObj.segments) {
+        // 按分段还原
+        let type = diffObj.type || 'line';
+        let segments = splitContent(contentStr, type).map(seg => seg === null ? '' : seg);
+        diffObj.segments.forEach(({ index, diff }) => {
+          const patched = JsDiff.applyPatch(segments[index] || '', diff);
+          if (patched === false) {
+            console.error('patch失败，原内容:', segments[index], 'diff:', diff);
+            // segments[index] = segments[index] || '';
+          } else {
+            segments[index] = patched;
+          }
+        });
+        contentStr = (type === 'paragraph') ? segments.join('\n\n') : segments.join('\n');
+      }
     } else if (nextVersion.content) {
       // 否则该版本是一个完整快照，直接替换
       contentStr = typeof nextVersion.content === 'string'
@@ -562,7 +579,6 @@ async function restoreVersionContent(documentId, versionNumber) {
     currentVersion++
   }
 
-  // 返回还原后的完整文档内容（此处保留字符串）
   return contentStr
 }
 
